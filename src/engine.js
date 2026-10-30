@@ -114,7 +114,7 @@ export function completeSet(s, done, now) {
   done = clamp(int(done, target), 0, 999);
   const at = Math.min(now, s.endsAt);
   const rec = { n: s.setNo, phase: s.phaseIdx, round: s.round, target, done,
-    start: s.setStartedAt - s.startedAt, end: at - s.startedAt, partial: false };
+    start: s.setStartedAt - s.startedAt, end: at - s.startedAt, partial: false, rate: done < target ? 'fail' : 'ok' };
   s.sets.push(rec);
   events.push({ type: 'set', rec });
   if (done < target && s.adapt.enabled) {
@@ -189,7 +189,17 @@ export function editLastSet(s, done) {
   const last = s.sets[s.sets.length - 1];
   if (!last) return;
   last.done = clamp(int(done, last.done), 0, 999);
+  if (last.partial) return;
+  if (last.done < last.target) last.rate = 'fail'; else if (last.rate === 'fail') last.rate = 'ok';
 }
+/** Bewertung des letzten Satzes: 'ok' (geschafft) · 'hard' (knapp) · 'fail' (nicht geschafft). */
+export function rateLastSet(s, rate) {
+  const last = s.sets[s.sets.length - 1];
+  if (!last || !RATES.includes(rate)) return;
+  last.rate = rate;
+}
+export const RATES = ['ok', 'hard', 'fail'];
+export const rateOf = x => x.rate || (x.done < x.target ? 'fail' : 'ok');
 
 export function skipRest(s, now) {
   if (s.status !== 'rest') return [];
@@ -252,3 +262,134 @@ export const TEMPLATES = [
   { id: 'tpl-klimmzug-8', template: true, name: 'Klimmzug-EDT 8 min', exercise: 'Klimmzüge', limitMin: 8,
     phases: [{ reps: 3, restSec: 30, rounds: 6 }, { reps: 3, restSec: 40, rounds: null }], adapt: { enabled: true, mode: 'both', reps: 1, rest: 10, minReps: 1 }, auto: { enabled: true, pct: 40, phase2: 'rest' } },
 ].map(normalizeWorkout);
+
+// ---------- Phasen-Zeiträume ----------
+/** Geschätzte Dauer einer Wiederholung in Sekunden je Übung (inkl. kurzer Umkehrpunkte). */
+export const SEC_PER_REP = { 'Liegestütze': 2, 'Kniebeugen': 2, 'Dips': 2.5, 'Klimmzüge': 3, _: 2.5 };
+export const secPerRepFor = ex => SEC_PER_REP[ex] ?? SEC_PER_REP._;
+export const MAX_PHASES = 4;
+
+/** Gemessenes Tempo (s/Wdh.) aus den letzten Einheiten einer Übung: Median über volle Sätze, mind. 3 Sätze. */
+export function measuredSecPerRep(history, exercise, lastN = 3) {
+  const runs = history.filter(h => h.exercise === exercise && !h.aborted && Array.isArray(h.sets)).slice(-lastN);
+  const v = [];
+  for (const h of runs) for (const x of h.sets) if (!x.partial && x.done > 0 && x.end > x.start) v.push((x.end - x.start) / 1000 / x.done);
+  if (v.length < 3) return null;
+  v.sort((a, b) => a - b);
+  const m = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+  return Math.round(clamp(m, 0.8, 8) * 10) / 10;
+}
+
+/**
+ * Zeiträume je Phase. Simuliert den Ablauf mit festem Tempo (secPerRep) und der jeweiligen Pause.
+ * src = Workout (Vorschau ab 0:00) oder laufende Session (bisherige Sätze + Rest ab "now" geschätzt).
+ * Ergebnis je Phase: start/end in ms ab Trainingsbeginn, firstRound/lastRound (fortlaufende Satznummer),
+ * reached=false wenn die Phase im Zeitlimit nicht mehr beginnt. Letzte erreichte Phase endet beim Zeitlimit.
+ */
+export function phaseTimeline(src, secPerRep = 2, now = null) {
+  const live = !!src.status;
+  const s = live ? structuredClone(src) : createSession(src, 0).state;
+  let t = live ? (now ?? s.startedAt) : 0;
+  const starts = []; // {phase, n, start}
+  for (const x of s.sets) starts.push({ phase: x.phase, n: x.n, start: x.start });
+  const spr = secPerRep * 1000;
+  for (let guard = 0; guard < 10000 && s.status !== 'done'; guard++) {
+    if (s.status === 'work' || s.status === 'partial') {
+      const fin = Math.max(t, s.setStartedAt + s.target * spr);
+      if (s.status === 'partial' || fin >= s.endsAt) { starts.push({ phase: s.phaseIdx, n: s.setNo, start: s.setStartedAt - s.startedAt }); break; }
+      t = fin; completeSet(s, s.target, t);
+      const x = s.sets[s.sets.length - 1]; starts.push({ phase: x.phase, n: x.n, start: x.start });
+    } else if (s.status === 'rest') { t = Math.max(t, Math.min(s.restEndsAt, s.endsAt)); tick(s, t); }
+    else break;
+  }
+  const out = s.phases.map((p, i) => ({ idx: i, reps: p.reps, restSec: p.restSec, rounds: p.rounds, reached: false, start: null, end: null, firstRound: null, lastRound: null }));
+  for (const x of starts) {
+    const o = out[x.phase];
+    if (!o.reached) Object.assign(o, { reached: true, start: x.start, firstRound: x.n, lastRound: x.n });
+    else { o.start = Math.min(o.start, x.start); o.firstRound = Math.min(o.firstRound, x.n); o.lastRound = Math.max(o.lastRound, x.n); }
+  }
+  if (out[0].reached) out[0].start = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (!out[i].reached) continue;
+    const nx = out.slice(i + 1).find(o => o.reached);
+    out[i].end = nx ? nx.start : s.limitMs;
+  }
+  return out;
+}
+export const mmss = ms => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+/** "Phase 1 · 0:00–3:30 · 10 Wdh / 15 s Pause, Runden 1–6" */
+export function phaseLabel(o) {
+  if (!o.reached) return `Phase ${o.idx + 1} · nicht erreicht · ${o.reps} Wdh / ${o.restSec} s Pause`;
+  const r = o.firstRound === o.lastRound ? `Runde ${o.firstRound}` : `Runden ${o.firstRound}–${o.lastRound}`;
+  return `Phase ${o.idx + 1} · ${mmss(o.start)}–${mmss(o.end)} · ${o.reps} Wdh / ${o.restSec} s Pause, ${r}`;
+}
+/** Erste fortlaufende Runde jeder Phase (aus den Rundenzahlen). */
+export function phaseStartRounds(phases) {
+  const r = []; let n = 1;
+  for (const p of phases) { r.push(n); n += p.rounds ?? 0; }
+  return r;
+}
+
+// ---------- Anpassung nach dem Training ----------
+/**
+ * Regel (pro Übung, für die nächste Einheit):
+ *  - Abgebrochen oder < 3 volle Sätze → kein Vorschlag.
+ *  - Erster nicht geschaffter Satz (Runde X, Teilsatz am Zeitende zählt nicht) in Phase k:
+ *      A) gibt es eine Folgephase und X−1 > Start(k): Phase k+1 beginnt ab Runde X−1 (Phase k hat X−1−Start(k) Runden).
+ *      B) sonst bzw. als Alternative: Wdh. in Phase k um 10 % senken (mind. −1, mind. 1 Wdh.).
+ *      Nur eine Phase und X−1 ≥ 2: A) = ab Runde X−1 neue Phase 2 mit 80 % der Wdh.
+ *  - Alle Sätze „geschafft“ (kein „knapp“, kein „nicht geschafft“):
+ *      Phase 2 erreicht: A) Phase 2 startet 2 Runden später, B) Pause der Phase 2 um 5 s kürzer (nicht unter Pause Phase 1).
+ *      Phase 2 nicht erreicht oder nur eine Phase: Pause Phase 1 um 5 s kürzer (mind. 5 s).
+ *  - Sonst (einzelne „knapp“): Plan beibehalten.
+ */
+export function suggestTune({ sets, phases, aborted }) {
+  if (aborted || !Array.isArray(phases) || !phases.length) return null;
+  const P = phases.map(p => ({ ...p }));
+  const full = sets.filter(x => !x.partial);
+  if (full.length < 3) return null;
+  const starts = phaseStartRounds(P);
+  const fail = full.find(x => rateOf(x) === 'fail');
+  const opts = [];
+  const cl = () => P.map(p => ({ ...p }));
+  if (fail) {
+    const X = fail.n, k = fail.phase;
+    if (k < P.length - 1 && X - 1 > starts[k]) {
+      const q = cl(); q[k].rounds = X - 1 - starts[k];
+      opts.push({ key: 'earlier', phases: q, text: `Phase ${k + 2} ab Runde ${X - 1} statt ${starts[k + 1]}` });
+    } else if (P.length === 1 && X - 1 >= 2 && P.length < MAX_PHASES) {
+      const q = cl(); q[0].rounds = X - 2; q.push({ reps: Math.max(1, Math.round(P[0].reps * 0.8)), restSec: P[0].restSec, rounds: null });
+      opts.push({ key: 'split', phases: q, text: `Ab Runde ${X - 1} neue Phase 2 mit ${q[1].reps} Wdh.` });
+    }
+    if (P[k].reps > 1) {
+      const q = cl(); q[k].reps = Math.max(1, P[k].reps - Math.max(1, Math.round(P[k].reps * 0.1)));
+      opts.push({ key: 'reps', phases: q, text: `Phase ${k + 1}: ${q[k].reps} statt ${P[k].reps} Wdh.` });
+    }
+    if (!opts.length) return { kind: 'keep', round: X, phase: k, text: `Runde ${X} nicht geschafft, Plan ist bereits am Minimum.`, options: [] };
+    return { kind: 'harder', round: X, phase: k, text: `Ab Runde ${X} (Phase ${k + 1}) nicht geschafft.`, options: opts };
+  }
+  if (full.every(x => rateOf(x) === 'ok')) {
+    const reached2 = P.length > 1 && full.some(x => x.phase >= 1);
+    if (reached2) {
+      const q = cl(); q[0].rounds = Math.min(99, P[0].rounds + 2);
+      opts.push({ key: 'later', phases: q, text: `Phase 2 ab Runde ${starts[1] + 2} statt ${starts[1]}` });
+      if (P[1].restSec - 5 >= P[0].restSec && P[1].restSec >= 5) {
+        const q2 = cl(); q2[1].restSec = P[1].restSec - 5;
+        opts.push({ key: 'rest2', phases: q2, text: `Phase 2: Pause ${q2[1].restSec} s statt ${P[1].restSec} s` });
+      }
+    } else if (P[0].restSec - 5 >= 5) {
+      const q = cl(); q[0].restSec = P[0].restSec - 5;
+      opts.push({ key: 'rest1', phases: q, text: `Phase 1: Pause ${q[0].restSec} s statt ${P[0].restSec} s` });
+    }
+    if (!opts.length) return { kind: 'keep', text: 'Alle Sätze geschafft, Pausen bereits am Minimum.', options: [] };
+    return { kind: 'easier', text: 'Alle Sätze geschafft.', options: opts };
+  }
+  const hard = full.filter(x => rateOf(x) === 'hard').length;
+  return { kind: 'keep', text: `Alle Sätze geschafft, ${hard} knapp. Plan bleibt.`, options: [] };
+}
+
+/** Gespeicherte Anpassung auf ein anderes Maximum umrechnen (Wdh. proportional). */
+export function scaleTune(tune, max) {
+  if (!tune || !tune.max || !max || tune.max === max) return tune;
+  return { ...tune, max, phases: tune.phases.map(p => ({ ...p, reps: Math.max(1, Math.round(p.reps * max / tune.max)) })) };
+}
