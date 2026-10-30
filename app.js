@@ -2,7 +2,7 @@ import * as E from './engine.js';
 import * as A from './audio.js';
 import { store } from './store.js';
 
-const VERSION = '1.0.0-26e15134';
+const VERSION = '1.1.0-5350137d';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +15,7 @@ const st = {
   view: 'home', workouts: store.workouts(), history: store.history(), settings: store.settings(),
   session: null, lead: null, draft: null, result: null, resultFrom: 'home', histFilter: null,
   adj: 0, layoutKey: '', sheet: null, partialVal: 0, installEvt: null, maxes: store.maxes(), assess: null,
+  tunes: store.tunes(), plan: null, tuneSel: 0,
 };
 window.__rz = st;
 
@@ -24,6 +25,13 @@ applySettings();
 const bestOf = id => st.history.filter(h => h.workoutId === id && !h.aborted).reduce((b, h) => (!b || h.total > b.total ? h : b), null);
 const workoutById = id => st.workouts.find(w => w.id === id);
 const maxOf = ex => { const l = st.maxes[ex]; return l && l.length ? l[l.length - 1] : null; };
+// Tempo-Schätzung: gemessen aus den letzten Einheiten, sonst Standardwert der Übung
+const tempoOf = ex => { const m = E.measuredSecPerRep(st.history, ex); return m ? { spr: m, measured: true } : { spr: E.secPerRepFor(ex), measured: false }; };
+// Für die nächste Einheit gespeicherte Phasen-Anpassung (pro Übung), Wdh. auf aktuelles Maximum umgerechnet
+const tuneOf = ex => { const t = st.tunes[ex]; if (!t) return null; const m = maxOf(ex); return t.max && m ? E.scaleTune(t, m.v) : t; };
+const phasesOf = w => { const t = tuneOf(w.exercise); return structuredClone(t ? E.normalizeWorkout({ ...w, phases: t.phases }).phases : w.phases); };
+const samePhases = (a, b) => JSON.stringify(E.normalizeWorkout({ phases: a }).phases) === JSON.stringify(E.normalizeWorkout({ phases: b }).phases);
+const sec = v => `${de(v)} s`;
 const dShort = iso => new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
 function toast(msg) {
@@ -46,12 +54,13 @@ function viewHome() {
   const tiles = E.EXERCISES.map(ex => { const mx = maxOf(ex);
     return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}"><span class="exname">${ex}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>` : 'Einstufen'}</span></button>`; }).join('');
   const cards = list.map(w => {
-    const b = bestOf(w.id), plan = E.simulate(w).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
+    const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
+    const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
     return `<article class="card" data-id="${w.id}">
       <div class="card-head"><span class="tag">${esc(w.exercise)}</span><span class="dur">${w.limitMin} min</span></div>
       <h3>${esc(w.name)}</h3>
-      <div class="phases">${w.phases.map((p, i) => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>${i < w.phases.length - 1 ? '<span class="arr">→</span>' : ''}`).join('')}</div>
-      <div class="meta">${wm ? `<span class="pill acc">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
+      <div class="phases">${ew.phases.map((p, i) => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>${i < ew.phases.length - 1 ? '<span class="arr">→</span>' : ''}`).join('')}</div>
+      <div class="meta">${tn ? `<span class="pill acc">Phasen angepasst ${dShort(tn.date)}</span>` : wm ? `<span class="pill acc">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
       <div class="card-foot">
         <div class="best"><small>Bestwert</small><b>${b ? b.total : '–'}</b></div>
         <div class="best"><small>Plan ≈</small><b class="dim">${plan}</b></div>
@@ -115,7 +124,7 @@ function saveAssess() {
   A.say(`Maximum ${v} gespeichert`);
   toast(`Maximum ${v} ${a.ex} gespeichert${n ? ` · ${n} Workout${n > 1 ? 's' : ''} angepasst` : ''}`);
   const then = a.then; st.assess = null;
-  if (then.startsWith('start:')) return startWorkout(workoutById(then.slice(6)));
+  if (then.startsWith('start:')) return openPlan(workoutById(then.slice(6)));
   if (then === 'edit' && st.draft) { if (st.draft.exercise === a.ex) E.applyAutoPlan(st.draft, v); return go('edit'); }
   go(then === 'history' ? 'history' : 'home');
 }
@@ -129,7 +138,7 @@ function stepper(path, val, unit, limKey) {
 }
 function viewEdit() {
   const w = st.draft, custom = !E.EXERCISES.includes(w.exercise);
-  const plan = E.simulate(w);
+  const tempo = tempoOf(w.exercise), plan = E.simulate(w, tempo.spr), tl = E.phaseTimeline(w, tempo.spr), tn = tuneOf(w.exercise);
   const seg = (name, val, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-seg="${name}" data-v="${v}" class="${val === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   return `<header class="top"><button class="icon" data-go="home" aria-label="Zurück">‹</button><h2>${st.workouts.some(x => x.id === w.id) ? 'Workout bearbeiten' : 'Neues Workout'}</h2><button class="btn primary sm" data-act="save">Speichern</button></header>
   <main class="scroll form">
@@ -139,17 +148,18 @@ function viewEdit() {
     ${autoPanel(w)}
     <div class="field"><span>Zeitlimit</span><div class="row2">${stepper('limitMin', w.limitMin, ' min', 'limitMin')}<input type="range" id="f-lim" min="1" max="60" value="${w.limitMin}"></div></div>
     <div class="field"><span>Phasen</span>
-      ${w.phases.map((p, i) => `<div class="phase"><div class="phase-h"><b>Phase ${i + 1}</b>${w.phases.length > 1 ? `<button class="link danger" data-act="delphase" data-i="${i}">Entfernen</button>` : ''}</div>
+      ${tn ? `<div class="tunenote">Nächste Einheit ${esc(w.exercise)} nutzt die angepassten Phasen vom ${dShort(tn.date)}. <button class="link" data-act="tune-drop" data-tex="${esc(w.exercise)}">Anpassung verwerfen</button></div>` : ''}
+      ${w.phases.map((p, i) => `<div class="phase"><div class="phase-h"><b>Phase ${i + 1} <span class="ptime">${tlRange(tl[i])}</span></b>${w.phases.length > 1 ? `<button class="link danger" data-act="delphase" data-i="${i}">Entfernen</button>` : ''}</div>
         <div class="prow"><span>Wdh. pro Satz</span>${stepper(`phases.${i}.reps`, p.reps, '', 'reps')}</div>
         <div class="prow"><span>Pause</span>${stepper(`phases.${i}.restSec`, p.restSec, ' s', 'restSec')}</div>
         <div class="prow"><span>Runden</span>${i === w.phases.length - 1 ? '<div class="untilend">bis Zeitende</div>' : stepper(`phases.${i}.rounds`, p.rounds, '×', 'rounds')}</div></div>`).join('')}
-      <button class="btn ghost wide" data-act="addphase">+ Phase hinzufügen</button></div>
+      ${w.phases.length < E.MAX_PHASES ? `<button class="btn ghost wide" data-act="addphase">+ Phase hinzufügen</button>` : ''}</div>
     <div class="field"><span>Zählweise</span>${seg('countMode', w.countMode, [['set', 'Satz bestätigen'], ['tap', 'Jede Wdh. tippen']])}</div>
     <div class="field"><label class="toggle"><span>Auto-Anpassung<small>Wenn ein Satz nicht geschafft wird</small></span><input type="checkbox" class="switch" id="f-adapt" ${w.adapt.enabled ? 'checked' : ''}></label>
       ${w.adapt.enabled ? `${seg('adapt.mode', w.adapt.mode, [['reps', 'Wdh. senken'], ['rest', 'Pause länger'], ['both', 'Beides']])}
         ${w.adapt.mode !== 'rest' ? `<div class="prow"><span>Wdh. senken um</span>${stepper('adapt.reps', w.adapt.reps, '', 'adapt.reps')}</div><div class="prow"><span>Mindestens</span>${stepper('adapt.minReps', w.adapt.minReps, ' Wdh', 'adapt.minReps')}</div>` : ''}
         ${w.adapt.mode !== 'reps' ? `<div class="prow"><span>Pause länger um</span>${stepper('adapt.rest', w.adapt.rest, ' s', 'adapt.rest')}</div>` : ''}` : ''}</div>
-    <div class="planbox">Planwert bei 1,5 s pro Wdh. ohne Ausfälle: <b>${plan.total} Wdh.</b> in ${plan.sets} Sätzen</div>
+    <div class="planbox">Planwert bei ${sec(tempo.spr)} pro Wdh. (${tempo.measured ? 'gemessen' : 'Schätzung'}) ohne Ausfälle: <b>${plan.total} Wdh.</b> in ${plan.sets} Sätzen</div>
     <div class="row-actions">${st.workouts.some(x => x.id === w.id) ? `<button class="btn ghost" data-act="dup">Duplizieren</button><button class="btn ghost danger" data-act="delw">Löschen</button>` : ''}</div>
   </main>`;
 }
@@ -169,6 +179,79 @@ function autoPanel(w) {
   </div></div>`;
 }
 
+// ---------- Plan-Vorschau mit Phasen-Editor ----------
+const tlRange = o => o.reached ? `${E.mmss(o.start)}–${E.mmss(o.end)}` : 'nicht erreicht';
+const tlRounds = o => !o.reached ? '' : o.firstRound === o.lastRound ? `Runde ${o.firstRound}` : `Runden ${o.firstRound}–${o.lastRound}`;
+function timelineBar(tl, limitMs, cur = -1) {
+  return `<div class="tlbar">${tl.filter(o => o.reached).map(o => `<div class="tlseg p${o.idx % 4} ${o.idx === cur ? 'cur' : ''}" style="flex:${Math.max(1, o.end - o.start)}"><b>P${o.idx + 1}</b><small>${E.mmss(o.start)}</small></div>`).join('')}</div>
+    <div class="tlends"><span>0:00</span><span>${E.mmss(limitMs)}</span></div>`;
+}
+function openPlan(w) {
+  if (!w) return go('home');
+  const phases = phasesOf(w);
+  st.plan = { workoutId: w.id, phases, base: structuredClone(phases) };
+  go('plan');
+}
+const planWorkout = () => { const w = workoutById(st.plan.workoutId); return { ...w, phases: st.plan.phases }; };
+function viewPlan() {
+  const w = planWorkout(), P = st.plan.phases, tempo = tempoOf(w.exercise), tn = tuneOf(w.exercise);
+  const tl = E.phaseTimeline(w, tempo.spr), starts = E.phaseStartRounds(P), sim = E.simulate(w, tempo.spr);
+  const last = P.length - 1;
+  const st2 = (f, i, val, unit) => `<div class="stepper"><button data-pst="${f}" data-i="${i}" data-d="-1" aria-label="weniger">−</button><output>${val}<small>${unit}</small></output><button data-pst="${f}" data-i="${i}" data-d="1" aria-label="mehr">+</button></div>`;
+  const cards = P.map((p, i) => { const o = tl[i];
+    return `<div class="phase pcard p${i % 4} ${o.reached ? '' : 'off'}" data-phase="${i}">
+      <div class="phase-h"><b>Phase ${i + 1}</b>${P.length > 1 ? `<button class="link danger" data-act="plan-del" data-i="${i}">Entfernen</button>` : ''}</div>
+      <div class="prange"><span class="ptime big">${tlRange(o)}</span><span class="muted">${tlRounds(o)}</span></div>
+      <div class="plabel">${esc(E.phaseLabel(o))}</div>
+      ${i > 0 ? `<div class="prow"><span>Start ab Runde</span>${st2('start', i, starts[i], '')}</div>` : ''}
+      <div class="prow"><span>Wdh. pro Satz</span>${st2('reps', i, p.reps, '')}</div>
+      <div class="prow"><span>Pause</span>${st2('restSec', i, p.restSec, ' s')}</div>
+      ${i === last ? '<div class="prow"><span>Dauer</span><div class="untilend">bis Zeitende</div></div>' : ''}
+    </div>`; }).join('');
+  const dirty = !samePhases(P, st.plan.base);
+  return `<header class="top"><button class="icon" data-go="home" aria-label="Zurück">‹</button><h2>Plan</h2><span class="ver">${w.limitMin} min</span></header>
+  <main class="scroll form">
+    <div class="planhead"><b>${esc(w.name)}</b><span class="muted">${esc(w.exercise)} · Tempo ${sec(tempo.spr)}/Wdh. ${tempo.measured ? '(gemessen, letzte Einheiten)' : '(Schätzung)'} + Pause</span></div>
+    ${timelineBar(tl, w.limitMin * 60000)}
+    ${tn && !dirty ? `<div class="tunenote">Angepasst am ${dShort(tn.date)}${tn.text ? `: ${esc(tn.text)}` : ''}. <button class="link" data-act="tune-drop" data-tex="${esc(w.exercise)}">Workout-Plan verwenden</button></div>` : ''}
+    ${dirty ? `<div class="tunenote">Geändert. Wird beim Start für die nächsten Einheiten ${esc(w.exercise)} gespeichert. <button class="link" data-act="plan-reset">Zurücksetzen</button></div>` : ''}
+    <div class="field"><span>Phasen</span>${cards}
+      ${P.length < E.MAX_PHASES ? `<button class="btn ghost wide" data-act="plan-add">+ Phase hinzufügen</button>` : `<p class="muted">Maximal ${E.MAX_PHASES} Phasen.</p>`}</div>
+    <div class="planbox">Planwert: <b>${sim.total} Wdh.</b> in ${sim.sets} Sätzen, ohne Ausfälle</div>
+  </main>
+  <div class="dock"><button class="btn primary wide big" data-act="plan-start">Training starten</button></div>`;
+}
+function planStep(f, i, d) {
+  const P = st.plan.phases, last = P.length - 1;
+  if (f === 'reps') P[i].reps = Math.min(999, Math.max(1, P[i].reps + d));
+  if (f === 'restSec') P[i].restSec = Math.min(600, Math.max(0, P[i].restSec + 5 * d));
+  if (f === 'start' && i > 0) {
+    const prev = P[i - 1];
+    if (prev.rounds + d < 1 || prev.rounds + d > 99) return;
+    if (i < last && P[i].rounds - d < 1) return; // folgende Phasen behalten ihren Start
+    prev.rounds += d; if (i < last) P[i].rounds -= d;
+  }
+}
+function planAdd() {
+  const P = st.plan.phases; if (P.length >= E.MAX_PHASES) return;
+  const tl = E.phaseTimeline(planWorkout(), tempoOf(workoutById(st.plan.workoutId).exercise).spr), o = tl.at(-1), last = P.at(-1);
+  last.rounds = o.reached ? Math.max(1, Math.ceil((o.lastRound - o.firstRound + 1) / 2)) : 3;
+  P.push({ reps: last.reps, restSec: last.restSec + 5, rounds: null });
+}
+function planDel(i) {
+  const P = st.plan.phases; if (P.length < 2) return;
+  if (i > 0 && i < P.length - 1) P[i - 1].rounds += P[i].rounds; // nachfolgende Phase behält ihren Start
+  P.splice(i, 1); P.at(-1).rounds = null;
+}
+function planStart() {
+  const w = planWorkout(), ex = w.exercise;
+  if (!samePhases(st.plan.phases, st.plan.base)) {
+    const m = maxOf(ex);
+    st.tunes = store.setTune(ex, { phases: E.normalizeWorkout(w).phases, max: m ? m.v : null, date: new Date(now()).toISOString(), source: 'manuell', text: 'Phasen im Plan geändert' });
+  }
+  st.plan = null; startWorkout(w);
+}
+
 // ---------- Training ----------
 function startWorkout(w) {
   A.unlock(); A.keepAwake(true);
@@ -178,8 +261,18 @@ function startWorkout(w) {
 }
 function beginSession() {
   const { state, events } = E.createSession(st.lead.workout, now());
+  state.spr = tempoOf(state.exercise).spr;
   st.lead = null; st.session = state; st.adj = state.target;
   handle(events); store.saveActive(state);
+}
+function phaseMarks(s) {
+  const tl = E.phaseTimeline(s, s.spr || E.secPerRepFor(s.exercise), now());
+  return tl.slice(1).filter(o => o.reached).map(o => `<span class="mk" style="left:${(100 * o.start / s.limitMs).toFixed(2)}%"></span>`).join('');
+}
+function phaseStrip(s) {
+  if (s.phases.length < 2) return '';
+  const tl = E.phaseTimeline(s, s.spr || E.secPerRepFor(s.exercise), now());
+  return `<div class="pstrip">${tl.map(o => `<span class="${o.idx === s.phaseIdx ? 'on' : ''} ${o.reached ? '' : 'off'}">P${o.idx + 1} ${o.reached ? `${E.mmss(o.start)}–${E.mmss(o.end)}` : '–'}</span>`).join('')}</div>`;
 }
 function posText(s) {
   const p = s.phases[s.phaseIdx];
@@ -191,7 +284,7 @@ function viewTrain() {
     <div class="leadbox"><div class="lbl">Gleich geht's los</div><div id="t-lead" class="leadnum">${st.settings.leadIn}</div><div class="lbl">${esc(st.lead.workout.exercise)} · ${st.lead.workout.limitMin} min · Ziel ${st.lead.workout.phases[0].reps} Wdh.</div></div></div>`;
   const tap = s.countMode === 'tap', next = s.phases[s.phaseIdx];
   const top = `<header class="ttop"><button class="icon" data-act="quit" aria-label="Beenden">✕</button><div class="tname">${esc(s.workoutName)}</div><button class="icon" data-act="mute" aria-label="Ton">${st.settings.sound ? '🔊' : '🔇'}</button></header>
-    <section class="clock"><div id="t-clock" class="bigclock">${fmt(s.endsAt - now())}</div><div class="bar"><i id="t-bar"></i></div></section>
+    <section class="clock"><div id="t-clock" class="bigclock">${fmt(s.endsAt - now())}</div><div class="bar"><i id="t-bar"></i>${phaseMarks(s)}</div>${phaseStrip(s)}</section>
     <section class="stats"><div class="stat main"><div id="t-total" class="num">${E.total(s)}</div><div class="lbl">Wdh. gesamt</div></div>
       <div class="stat"><div id="t-proj" class="num sm">–</div><div class="lbl">Hochrechnung</div></div>
       <div class="stat"><div id="t-vs" class="num sm">–</div><div class="lbl">vs. Bestwert</div></div></section>
@@ -210,7 +303,8 @@ function viewTrain() {
     body = `<section class="rest"><div class="ringwrap"><svg class="ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rbg"/><circle id="t-ring" cx="100" cy="100" r="88" class="rfg" pathLength="1000"/></svg>
         <div class="ring-in"><div id="t-rest" class="restnum">${Math.ceil((s.restEndsAt - now()) / 1000)}</div><div class="lbl">Pause</div></div></div>
         <div class="next">Als Nächstes: <b>${s.target} Wdh.</b>${s.pendingPhase ? `<span class="badge">Neue Phase: ${E.restSecFor(s)} s Pause</span>` : ''}</div></section>
-      <div class="restbar"><div class="last"><span>Letzter Satz</span><button class="round sm" data-act="last-minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus">+</button></div>
+      <div class="restbar">${last && !last.partial ? `<div class="rate"><span>Satz ${last.n}</span><div class="seg">${[['ok', 'geschafft'], ['hard', 'knapp'], ['fail', 'nicht geschafft']].map(([v, l]) => `<button data-rate="${v}" class="r-${v} ${E.rateOf(last) === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>` : ''}
+        <div class="last"><span>Letzter Satz</span><button class="round sm" data-act="last-minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus">+</button></div>
         <button class="btn ghost wide" data-act="skip">Pause überspringen</button></div>`;
   }
   return `<div class="train st-${s.status}">${top}${body}</div>${sheetHtml()}`;
@@ -258,7 +352,7 @@ function finishSession(discard = false) {
   if (discard || !s) { go('home'); return; }
   const sum = E.summary(s), prevBest = bestOf(s.workoutId);
   const entry = { id: uid('s'), workoutId: s.workoutId, workoutName: s.workoutName, exercise: s.exercise, date: new Date(s.startedAt).toISOString(),
-    limitMs: s.limitMs, total: sum.total, sets: s.sets, elapsedMs: sum.elapsedMs, aborted: sum.aborted, perMin: sum.perMin,
+    limitMs: s.limitMs, total: sum.total, sets: s.sets, phases: s.phases, spr: s.spr, elapsedMs: sum.elapsedMs, aborted: sum.aborted, perMin: sum.perMin,
     prevBest: prevBest ? prevBest.total : null };
   st.history.push(entry); store.saveHistory(st.history);
   st.result = entry; st.resultFrom = 'home'; go('result');
@@ -312,14 +406,14 @@ function barChart(sets) {
   const W = 340, H = 170, pad = 22, maxV = Math.max(...sets.map(x => Math.max(x.done, x.target)), 1);
   const bw = (W - pad) / sets.length, y = v => H - pad - (v / maxV) * (H - pad - 14);
   const bars = sets.map((x, i) => {
-    const cls = x.partial ? 'partial' : x.done >= x.target ? 'full' : 'miss', bx = pad + i * bw + bw * 0.15, w = bw * 0.7;
+    const cls = x.partial ? 'partial' : E.rateOf(x) === 'fail' || x.done < x.target ? 'miss' : E.rateOf(x) === 'hard' ? 'hard' : 'full', bx = pad + i * bw + bw * 0.15, w = bw * 0.7;
     return `<rect class="b ${cls}" x="${bx}" y="${y(x.done)}" width="${w}" height="${H - pad - y(x.done)}" rx="${Math.min(4, w / 3)}"/>
       <line class="tg" x1="${bx - 1}" x2="${bx + w + 1}" y1="${y(x.target)}" y2="${y(x.target)}"/>
       ${sets.length <= 20 ? `<text x="${bx + w / 2}" y="${y(x.done) - 4}" class="v">${x.done}</text>` : ''}
       ${sets.length <= 20 || i % 5 === 4 ? `<text x="${bx + w / 2}" y="${H - 6}" class="ax">${i + 1}</text>` : ''}`;
   }).join('');
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Wiederholungen pro Satz"><text x="0" y="${y(maxV) + 4}" class="ax l">${maxV}</text><line class="base" x1="${pad}" x2="${W}" y1="${H - pad}" y2="${H - pad}"/>${bars}</svg>
-    <div class="legend"><span><i class="full"></i>geschafft</span><span><i class="miss"></i>unter Ziel</span><span><i class="partial"></i>Teilsatz</span><span><i class="tgl"></i>Ziel</span></div>`;
+    <div class="legend"><span><i class="full"></i>geschafft</span><span><i class="hard"></i>knapp</span><span><i class="miss"></i>nicht geschafft</span><span><i class="partial"></i>Teilsatz</span><span><i class="tgl"></i>Ziel</span></div>`;
 }
 function viewResult() {
   const r = st.result, isNew = st.resultFrom === 'home';
@@ -336,6 +430,7 @@ function viewResult() {
       ${!pr && best ? `<div class="sub">Bestwert ${best.total}${best.id !== r.id ? ` (${r.total - best.total >= 0 ? '+' : ''}${r.total - best.total})` : ''}</div>` : ''}
     </section>
     <section class="grid3"><div><b>${r.sets.length}</b><small>Sätze (${full} voll)</small></div><div><b>${de(r.perMin)}</b><small>Wdh./Minute</small></div><div><b>${fmt(r.elapsedMs)}</b><small>Dauer</small></div></section>
+    ${isNew ? tuneCard(r) : ''}
     ${retestCard(r)}
     <h3 class="h3">Wiederholungen pro Satz</h3>
     <div class="panel">${barChart(r.sets)}</div>
@@ -346,6 +441,28 @@ function viewResult() {
   </main>`;
 }
 
+function tuneCard(r) {
+  const sg = E.suggestTune(r);
+  if (!sg) return '';
+  const head = `<div class="panel-h"><span>Phasen für die nächste Einheit</span><span>${esc(r.exercise)}</span></div>`;
+  if (r.tuned) return `<div class="panel tune">${head}<p class="tunedone">Übernommen: ${esc(r.tuned)}</p></div>`;
+  if (!sg.options.length) return `<div class="panel tune">${head}<p>${esc(sg.text)}</p></div>`;
+  const sel = Math.min(st.tuneSel, sg.options.length - 1), opt = sg.options[sel];
+  const w = workoutById(r.workoutId) || { exercise: r.exercise, limitMin: Math.round(r.limitMs / 60000) };
+  const spr = tempoOf(r.exercise).spr;
+  const tl = E.phaseTimeline({ ...w, phases: opt.phases }, spr);
+  return `<div class="panel tune">${head}<p class="why ${sg.kind}">${esc(sg.text)}</p>
+    <div class="opts">${sg.options.map((o, i) => `<button class="opt ${i === sel ? 'on' : ''}" data-tsel="${i}"><i></i>${esc(o.text)}</button>`).join('')}</div>
+    <div class="tlist">${tl.map(o => `<div>${esc(E.phaseLabel(o))}</div>`).join('')}</div>
+    <button class="btn primary wide" data-act="tune-apply">Übernehmen</button></div>`;
+}
+function applyTune() {
+  const r = st.result, sg = E.suggestTune(r); if (!sg || !sg.options.length) return;
+  const opt = sg.options[Math.min(st.tuneSel, sg.options.length - 1)], m = maxOf(r.exercise);
+  st.tunes = store.setTune(r.exercise, { phases: opt.phases, max: m ? m.v : null, date: new Date(now()).toISOString(), source: 'auto', text: opt.text, from: r.id });
+  r.tuned = opt.text; store.saveHistory(st.history);
+  toast(`Gespeichert für die nächste Einheit ${r.exercise}`); render();
+}
 function retestCard(r) {
   const why = E.retestAdvice(r, maxOf(r.exercise), now());
   if (!why) return '';
@@ -425,13 +542,14 @@ function viewMore() {
 
 // ---------- Render & Navigation ----------
 function render() {
-  const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess }[st.view];
+  const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess, plan: viewPlan }[st.view];
   const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0;
   app.innerHTML = v(); app.dataset.view = st.view;
   if (keep && st.view === st._lastView && $('.scroll')) $('.scroll').scrollTop = keep;
   st._lastView = st.view;
 }
 function go(view) {
+  if (view === 'result' && st.view !== 'result') st.tuneSel = 0;
   st.view = view; st.layoutKey = ''; render();
   if (view === 'train' || view === 'assess') { loop(); frame(); } else window.scrollTo(0, 0);
   if (view !== 'train' && $('.scroll')) $('.scroll').scrollTop = 0;
@@ -467,16 +585,26 @@ app.addEventListener('click', e => {
   if (d.hf) { st.histFilter = d.hf; return render(); }
   if (d.lead) { st.settings.leadIn = +d.lead; store.saveSettings(st.settings); return render(); }
   if (d.pv != null) { st.partialVal = +d.pv; return render(); }
+  if (d.pst) { planStep(d.pst, +d.i, +d.d); return render(); }
+  if (d.rate) { E.rateLastSet(s, d.rate); store.saveActive(s); A.cue.tap(); return render(); }
+  if (d.tsel != null) { st.tuneSel = +d.tsel; return render(); }
   const card = b.closest('.card'), w = card && workoutById(card.dataset.id);
   switch (d.act) {
     case 'start':
       if (E.EXERCISES.includes(w.exercise) && !maxOf(w.exercise) && w.auto.enabled) return openAssess(w.exercise, 'start:' + w.id);
-      return startWorkout(w);
+      return openPlan(w);
+    case 'plan-start': return planStart();
+    case 'plan-add': planAdd(); return render();
+    case 'plan-del': planDel(+d.i); return render();
+    case 'plan-reset': st.plan.phases = structuredClone(st.plan.base); return render();
+    case 'tune-drop': st.tunes = store.setTune(d.tex, null); toast('Anpassung verworfen');
+      if (st.plan) { const w0 = workoutById(st.plan.workoutId); st.plan.phases = structuredClone(w0.phases); st.plan.base = structuredClone(w0.phases); } return render();
+    case 'tune-apply': return applyTune();
     case 'assess': return openAssess(d.aex, d.then || st.view);
     case 'applyauto': st.draft.auto.enabled = true; reauto(); return render();
     case 'av': st.assess.val = Math.max(1, Math.min(999, st.assess.val + +d.d)); st.assess.source = 'input'; return render();
     case 'assess-save': return saveAssess();
-    case 'assess-skip': { const id = st.assess.then.slice(6); st.assess = null; return startWorkout(workoutById(id)); }
+    case 'assess-skip': { const id = st.assess.then.slice(6); st.assess = null; return openPlan(workoutById(id)); }
     case 'assess-back': { const t = st.assess.then; st.assess = null; return go(t === 'edit' ? 'edit' : t === 'history' ? 'history' : 'home'); }
     case 'assess-test': A.unlock(); A.keepAwake(true); Object.assign(st.assess, { phase: 'lead', leadEnd: now() + 3000, count: 0, last: null }); go('assess'); return;
     case 'assess-tap': st.assess.count++; A.cue.tap(); { const el = $('#a-count'); if (el) el.textContent = st.assess.count; } return;
@@ -489,7 +617,7 @@ app.addEventListener('click', e => {
       st.draft = E.normalizeWorkout({ id: uid('w'), name: `${ex} ${5} min`, exercise: ex, limitMin: 5, phases: [{ reps: 10, restSec: 15, rounds: 6 }, { reps: 10, restSec: 20 }], auto: { enabled: E.EXERCISES.includes(ex) } });
       reauto(); return go('edit'); }
     case 'save': return saveDraft();
-    case 'addphase': { manualPhases(); const last = st.draft.phases.at(-1); st.draft.phases.at(-1).rounds = 5; st.draft.phases.push({ reps: last.reps, restSec: last.restSec + 5, rounds: null }); return render(); }
+    case 'addphase': { if (st.draft.phases.length >= E.MAX_PHASES) return; manualPhases(); const last = st.draft.phases.at(-1); st.draft.phases.at(-1).rounds = 5; st.draft.phases.push({ reps: last.reps, restSec: last.restSec + 5, rounds: null }); return render(); }
     case 'delphase': manualPhases(); st.draft.phases.splice(+d.i, 1); st.draft.phases.at(-1).rounds = null; return render();
     case 'dup': { const c = E.normalizeWorkout({ ...structuredClone(st.draft), id: uid('w'), name: st.draft.name + ' (Kopie)' }); st.workouts.push(c); store.saveWorkouts(st.workouts); toast('Kopie angelegt'); return go('home'); }
     case 'delw': if (confirm('Workout löschen? Der Verlauf bleibt erhalten.')) { st.workouts = st.workouts.filter(x => x.id !== st.draft.id); store.saveWorkouts(st.workouts); go('home'); } return;
@@ -511,7 +639,7 @@ app.addEventListener('click', e => {
     case 'pv-plus': st.partialVal++; return render();
     case 'partial-ok': st.sheet = null; return handle(E.finishPartial(s, st.partialVal, now()));
     // Ergebnis
-    case 'again': return startWorkout(workoutById(st.result.workoutId));
+    case 'again': return openPlan(workoutById(st.result.workoutId));
     case 'delsession': if (confirm('Eintrag löschen?')) { st.history = st.history.filter(h => h.id !== st.result.id); store.saveHistory(st.history); go('history'); } return;
     // Mehr
     case 'testsound': A.unlock(); A.cue.go(); A.say('Pause 15 Sekunden'); return;
@@ -522,7 +650,7 @@ app.addEventListener('click', e => {
     }
     case 'import': return $('#f-import').click();
     case 'templates': st.workouts = store.restoreTemplates(); return toast('Vorlagen wiederhergestellt');
-    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.settings = store.settings(); applySettings(); toast('Gelöscht'); render(); } return;
+    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); applySettings(); toast('Gelöscht'); render(); } return;
     case 'install': st.installEvt?.prompt(); st.installEvt = null; return render();
   }
 });
@@ -537,7 +665,7 @@ app.addEventListener('change', async e => {
   if (t.id === 'f-adapt') { st.draft.adapt.enabled = t.checked; return render(); }
   if (t.dataset.set) { st.settings[t.dataset.set] = t.checked; store.saveSettings(st.settings); applySettings(); return; }
   if (t.id === 'f-import' && t.files[0]) {
-    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.settings = store.settings(); applySettings();
+    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); applySettings();
       toast(`Importiert: ${r.workouts} Workouts, ${r.sessions} Einheiten`); render(); }
     catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
   }

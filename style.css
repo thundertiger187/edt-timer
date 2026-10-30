@@ -202,3 +202,44 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .mv{display:flex;align-items:baseline;gap:6px}.mv b{font-size:22px}.mv small{color:var(--mut);font-size:12px}
 .mv i{font-style:normal;font-size:13px;font-weight:800}.mv i.up{color:var(--acc)}.mv i.down{color:var(--warn)}
 .panel .btn.wide:first-child{margin-top:0}
+/* Plan-Vorschau & Phasen-Zeiträume */
+[data-view=plan] .scroll{padding-bottom:20px}
+.planhead{display:flex;flex-direction:column;gap:2px;margin:0 2px 12px}.planhead b{font-size:20px;letter-spacing:-.01em}
+.tlbar{display:flex;gap:3px;height:46px;border-radius:14px;overflow:hidden;margin-bottom:4px}
+.tlseg{display:flex;flex-direction:column;justify-content:center;padding:0 8px;min-width:44px;color:#0b0d10;font-size:12px;line-height:1.15}
+.tlseg b{font-size:14px}.tlseg small{font-weight:700;opacity:.75}
+.tlseg.p0{background:var(--acc)}.tlseg.p1{background:var(--acc2)}.tlseg.p2{background:#b69cff}.tlseg.p3{background:var(--warn)}
+.tlends{display:flex;justify-content:space-between;color:var(--mut);font-size:12px;margin:0 2px 14px}
+.pcard{border-left:4px solid var(--acc)}.pcard.p1{border-left-color:var(--acc2)}.pcard.p2{border-left-color:#b69cff}.pcard.p3{border-left-color:var(--warn)}
+.pcard.off{opacity:.55}
+.prange{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:2px 0 2px}
+.ptime{font-variant-numeric:tabular-nums;color:var(--acc2);font-weight:700;font-size:14px;margin-left:6px}
+.ptime.big{font-size:26px;font-weight:900;color:var(--tx);margin-left:0;letter-spacing:-.02em}
+.plabel{font-size:12px;color:var(--mut);margin-bottom:4px}
+.tunenote{background:rgba(198,255,61,.08);border:1px solid rgba(198,255,61,.3);color:#e6ffb0;border-radius:14px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.tunenote .link{color:var(--acc);padding:4px 0;text-decoration:underline}
+.dock{padding:10px 16px calc(var(--sab) + 12px);border-top:1px solid var(--line);background:rgba(11,13,16,.94)}
+.dock .btn.wide{margin-top:0}
+/* Training: Phasen-Marken und Zeiträume */
+.bar{position:relative}
+.bar .mk{position:absolute;top:0;bottom:0;width:2px;background:#fff;opacity:.8}
+.pstrip{display:flex;justify-content:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pstrip span{font-size:12px;font-weight:700;color:var(--mut);background:var(--bg2);border:1px solid var(--line);border-radius:99px;padding:3px 9px;font-variant-numeric:tabular-nums}
+.pstrip span.on{color:#0b0d10;background:var(--acc);border-color:var(--acc)}.st-rest .pstrip span.on{background:var(--acc2);border-color:var(--acc2)}
+.pstrip span.off{opacity:.5}
+/* Satz-Bewertung in der Pause */
+.rate{display:flex;align-items:center;gap:10px;margin-bottom:8px}.rate>span{color:var(--mut);font-weight:600;font-size:14px;white-space:nowrap}
+.rate .seg{flex:1}.rate .seg button{min-height:42px;font-size:13px;padding:0 4px}
+.rate .seg button.r-ok.on{box-shadow:inset 0 0 0 1.5px var(--acc);color:var(--acc)}
+.rate .seg button.r-hard.on{box-shadow:inset 0 0 0 1.5px var(--warn);color:var(--warn)}
+.rate .seg button.r-fail.on{box-shadow:inset 0 0 0 1.5px var(--bad);color:var(--bad)}
+/* Vorschlag nach dem Training */
+.panel.tune{border-color:rgba(198,255,61,.35);margin-top:12px}
+.tune p{margin:4px 0 10px;font-size:15px}.why.harder{color:var(--warn)}.why.easier{color:var(--acc)}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;align-items:center;gap:10px;text-align:left;min-height:48px;padding:8px 12px;border-radius:14px;background:var(--bg2);border:1px solid var(--line);font-weight:700;font-size:15px}
+.opt i{width:18px;height:18px;border-radius:50%;border:2px solid var(--mut);flex:none}
+.opt.on{border-color:var(--acc)}.opt.on i{border-color:var(--acc);background:radial-gradient(circle,var(--acc) 45%,transparent 50%)}
+.tlist{margin-top:10px;font-size:13px;color:#cdefff;background:rgba(56,217,255,.08);border-radius:12px;padding:10px 12px;line-height:1.6;font-variant-numeric:tabular-nums}
+.tunedone{color:var(--acc);font-weight:700}
+.chart .b.hard{fill:#e8d34a}.legend .hard{background:#e8d34a}

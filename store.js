@@ -1,6 +1,6 @@
 // Lokale Speicherung (localStorage). Kein Server.
 import { TEMPLATES, normalizeWorkout } from './engine.js';
-const K = { w: 'repzeit.workouts', h: 'repzeit.history', s: 'repzeit.settings', a: 'repzeit.active', m: 'repzeit.maxes' };
+const K = { w: 'repzeit.workouts', h: 'repzeit.history', s: 'repzeit.settings', a: 'repzeit.active', m: 'repzeit.maxes', t: 'repzeit.tunes' };
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
@@ -16,6 +16,10 @@ export const store = {
   maxes() { return read(K.m, {}); },
   latestMax(ex) { const l = this.maxes()[ex]; return l && l.length ? l[l.length - 1] : null; },
   addMax(ex, v, source) { const m = this.maxes(); (m[ex] ||= []).push({ v, date: new Date().toISOString(), source }); write(K.m, m); return m; },
+  // Phasen-Anpassung pro Übung für die nächste Einheit: { [Übung]: { phases, max, date, source: 'auto'|'manuell', text } }
+  tunes() { return read(K.t, {}); },
+  tuneOf(ex) { return this.tunes()[ex] || null; },
+  setTune(ex, t) { const all = this.tunes(); if (t) all[ex] = t; else delete all[ex]; write(K.t, all); return all; },
   active() { return read(K.a, null); },
   saveActive(a) { if (a) write(K.a, a); else localStorage.removeItem(K.a); },
   restoreTemplates() {
@@ -23,7 +27,7 @@ export const store = {
     for (const t of TEMPLATES) { const i = list.findIndex(x => x.id === t.id); if (i >= 0) list[i] = structuredClone(t); else list.push(structuredClone(t)); }
     this.saveWorkouts(list); return list;
   },
-  exportAll() { return { app: 'RepZeit', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), settings: this.settings() }; },
+  exportAll() { return { app: 'RepZeit', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), tunes: this.tunes(), settings: this.settings() }; },
   importAll(data) {
     if (!data || data.app !== 'RepZeit' || !Array.isArray(data.workouts) || !Array.isArray(data.history)) throw new Error('Keine gültige RepZeit-Datei.');
     const w = this.workouts(), h = this.history();
@@ -42,6 +46,7 @@ export const store = {
       }
       write(K.m, m);
     }
+    if (data.tunes && typeof data.tunes === 'object') write(K.t, { ...this.tunes(), ...data.tunes });
     if (data.settings) this.saveSettings({ ...this.settings(), ...data.settings });
     return { workouts: nw, sessions: nh };
   },

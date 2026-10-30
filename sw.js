@@ -1,5 +1,5 @@
 // Offline-Cache. Version wird beim Build gesetzt.
-const CACHE = 'repzeit-1.0.0-26e15134';
+const CACHE = 'repzeit-1.1.0-5350137d';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'engine.js', 'audio.js', 'store.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
