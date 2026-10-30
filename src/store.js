@@ -1,10 +1,25 @@
 // Lokale Speicherung (localStorage). Kein Server.
 import { TEMPLATES, normalizeWorkout } from './engine.js';
-const K = { w: 'repzeit.workouts', h: 'repzeit.history', s: 'repzeit.settings', a: 'repzeit.active', m: 'repzeit.maxes', t: 'repzeit.tunes' };
+const NAMES = { w: 'workouts', h: 'history', s: 'settings', a: 'active', m: 'maxes', t: 'tunes' };
+const K = Object.fromEntries(Object.entries(NAMES).map(([k, n]) => [k, 'edt.' + n]));
+/** Umbenennung RepZeit → EDT Timer: alte Schlüssel repzeit.* (gleiche Origin) einmalig nach edt.* kopieren.
+ *  Die alten Einträge bleiben als Sicherung stehen. Gibt zurück, welche Schlüssel übernommen wurden. */
+export function migrateLegacy(ls = localStorage) {
+  const moved = [];
+  try {
+    for (const n of Object.values(NAMES)) {
+      const old = ls.getItem('repzeit.' + n);
+      if (old != null && ls.getItem('edt.' + n) == null) { ls.setItem('edt.' + n, old); moved.push(n); }
+    }
+    if (moved.length) ls.setItem('edt.migrated', JSON.stringify({ from: 'repzeit', keys: moved, at: new Date().toISOString() }));
+  } catch { /* Speicher nicht verfügbar */ }
+  return moved;
+}
+export const migrated = typeof localStorage !== 'undefined' ? migrateLegacy() : [];
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
-export const DEFAULT_SETTINGS = { sound: true, voice: true, vibrate: true, wake: true, leadIn: 5, exSel: 'Liegestütze', asked: [] };
+export const DEFAULT_SETTINGS = { sound: true, voice: true, vibrate: true, wake: true, leadIn: 5, exSel: 'Liegestütze', asked: [], setupDone: false, planVer: 0 };
 
 export const store = {
   workouts() { const w = read(K.w, null); if (!w) { write(K.w, TEMPLATES); return structuredClone(TEMPLATES); } return w.map(normalizeWorkout); },
@@ -15,7 +30,7 @@ export const store = {
   saveSettings(s) { write(K.s, s); },
   maxes() { return read(K.m, {}); },
   latestMax(ex) { const l = this.maxes()[ex]; return l && l.length ? l[l.length - 1] : null; },
-  addMax(ex, v, source) { const m = this.maxes(); (m[ex] ||= []).push({ v, date: new Date().toISOString(), source }); write(K.m, m); return m; },
+  addMax(ex, v, source, durMs) { const m = this.maxes(); (m[ex] ||= []).push({ v, date: new Date().toISOString(), source, ...(durMs ? { durMs } : {}) }); write(K.m, m); return m; },
   // Phasen-Anpassung pro Übung für die nächste Einheit: { [Übung]: { phases, max, date, source: 'auto'|'manuell', text } }
   tunes() { return read(K.t, {}); },
   tuneOf(ex) { return this.tunes()[ex] || null; },
@@ -27,9 +42,9 @@ export const store = {
     for (const t of TEMPLATES) { const i = list.findIndex(x => x.id === t.id); if (i >= 0) list[i] = structuredClone(t); else list.push(structuredClone(t)); }
     this.saveWorkouts(list); return list;
   },
-  exportAll() { return { app: 'RepZeit', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), tunes: this.tunes(), settings: this.settings() }; },
+  exportAll() { return { app: 'EDT Timer', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), tunes: this.tunes(), settings: this.settings() }; },
   importAll(data) {
-    if (!data || data.app !== 'RepZeit' || !Array.isArray(data.workouts) || !Array.isArray(data.history)) throw new Error('Keine gültige RepZeit-Datei.');
+    if (!data || !['EDT Timer', 'RepZeit'].includes(data.app) || !Array.isArray(data.workouts) || !Array.isArray(data.history)) throw new Error('Keine gültige EDT-Timer-Datei.');
     const w = this.workouts(), h = this.history();
     let nw = 0, nh = 0;
     for (const x of data.workouts.map(normalizeWorkout)) { const i = w.findIndex(y => y.id === x.id); if (i >= 0) w[i] = x; else { w.push(x); nw++; } }
@@ -50,5 +65,5 @@ export const store = {
     if (data.settings) this.saveSettings({ ...this.settings(), ...data.settings });
     return { workouts: nw, sessions: nh };
   },
-  wipe() { Object.values(K).forEach(k => localStorage.removeItem(k)); },
+  wipe() { Object.values(NAMES).forEach(n => { localStorage.removeItem('edt.' + n); localStorage.removeItem('repzeit.' + n); }); localStorage.removeItem('edt.migrated'); },
 };

@@ -1,9 +1,9 @@
-// RepZeit – Ablauf-Logik (rein, ohne DOM). Alle Zeiten in ms, "now" wird immer übergeben.
+// EDT Timer – Ablauf-Logik (rein, ohne DOM). Alle Zeiten in ms, "now" wird immer übergeben.
 // Dadurch driftfrei (Zeitstempel statt Zählen) und deterministisch testbar.
 
 export const EXERCISES = ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge'];
 
-// ---------- Einstufung: Plan aus Maximalwiederholungen ----------
+// ---------- Fitnesstest → EDT-Plan aus Maximalwiederholungen ----------
 // Stufengrenzen [Mittel ab, Fortgeschritten ab] je Übung; Pausenfaktor für schwerere Übungen.
 export const LEVEL_RULES = {
   'Liegestütze': { th: [15, 35], f: 1 },
@@ -23,22 +23,41 @@ export function levelFor(exercise, max) {
   const i = max >= r.th[1] ? 2 : max >= r.th[0] ? 1 : 0;
   return { ...LEVELS[i], idx: i, th: r.th, factor: r.f };
 }
-/** Satz = pct % vom Maximum (mind. 1). Pause nach Stufe × Übungsfaktor. Phase 2 nach N Runden: längere Pause oder 80 % der Wdh. */
-export function planFromMax(exercise, max, { pct = 40, phase2 = 'rest' } = {}) {
-  max = Math.max(1, Math.round(max)); pct = clamp(Math.round(pct), 20, 80);
+/**
+ * EDT-Plan aus dem Maximum (Standard 3 Phasen).
+ *  Satz      = pct % vom Maximum (mind. 1)
+ *  Pause 1   = Stufenpause × Übungsfaktor (frisch, kurz)
+ *  Pause 2   = (Stufenpause + Stufenschritt) × Übungsfaktor
+ *  Phase 3   = variant 'reps': 80 % der Wdh. bei Pause 2 · variant 'rest': gleiche Wdh., (Stufenpause + 2 × Schritt) × Faktor
+ *  Sätze     = so gewählt, dass Phase 1 ≈ 45 %, Phase 2 ≈ 30 % und Phase 3 ≈ 25 % des Zeitlimits dauert
+ *              (Satzdauer = Wdh. × Tempo + Pause, Tempo aus SEC_PER_REP bzw. gemessen), mind. 1 Satz je Phase.
+ *  phases: 2 → Phase 1 ≈ 60 %, Phase 2 = Variante (80 % Wdh. bei Pause 1 bzw. Pause 2) bis Zeitende.
+ */
+export const PHASE_SHARES = { 2: [0.6], 3: [0.45, 0.3] };
+export function planFromMax(exercise, max, { pct = 40, variant, phase2, phases: n = 3, limitMin = 5, secPerRep } = {}) {
+  max = Math.max(1, Math.round(max)); pct = clamp(Math.round(pct), 20, 80); n = n === 2 ? 2 : 3;
+  variant = (variant ?? phase2) === 'rest' ? 'rest' : 'reps';
+  const spr = secPerRep ?? secPerRepFor(exercise), T = clamp(+limitMin || 5, 1, 60) * 60;
   const L = levelFor(exercise, max);
-  const reps = Math.max(1, Math.round(max * pct / 100));
-  const rest1 = r5(L.rest * L.factor);
-  const p2 = phase2 === 'reps' ? { reps: Math.max(1, Math.round(reps * 0.8)), restSec: rest1, rounds: null }
-    : { reps, restSec: r5((L.rest + L.step) * L.factor), rounds: null };
-  const phases = [{ reps, restSec: rest1, rounds: L.rounds }, p2];
+  const reps = Math.max(1, Math.round(max * pct / 100)), reps80 = Math.max(1, Math.round(reps * 0.8));
+  const rest1 = r5(L.rest * L.factor), rest2 = r5((L.rest + L.step) * L.factor), rest3 = r5((L.rest + 2 * L.step) * L.factor);
+  const ph = n === 3
+    ? [{ reps, restSec: rest1 }, { reps, restSec: rest2 }, variant === 'reps' ? { reps: reps80, restSec: rest2 } : { reps, restSec: rest3 }]
+    : [{ reps, restSec: rest1 }, variant === 'reps' ? { reps: reps80, restSec: rest1 } : { reps, restSec: rest2 }];
+  const shares = PHASE_SHARES[n];
+  ph.forEach((p, i) => { p.rounds = i < ph.length - 1 ? Math.max(1, Math.round(shares[i] * T / (p.reps * spr + p.restSec))) : null; });
+  // Letzte Phase braucht mindestens ein Viertel der Zeit: sonst vordere Phasen kürzen (mind. 1 Satz je Phase)
+  const cyc = p => p.reps * spr + p.restSec, used = () => ph.slice(0, -1).reduce((t, p) => t + p.rounds * cyc(p), 0);
+  for (let k = ph.length - 2; used() > 0.75 * T && ph.slice(0, -1).some(p => p.rounds > 1); k = k > 0 ? k - 1 : ph.length - 2)
+    if (ph[k].rounds > 1) ph[k].rounds--;
   const range = L.idx === 0 ? `unter ${L.th[0]}` : L.idx === 1 ? `${L.th[0]}–${L.th[1] - 1}` : `ab ${L.th[1]}`;
-  const explain = `Satz = ${pct} % × Max ${max} = ${reps} Wdh. · Stufe ${L.name} (${range}) · Pause ${rest1} s × ${L.rounds} Runden, danach ${p2.reps !== reps ? `${p2.reps} Wdh. bei ` : ''}${p2.restSec} s bis Zeitende`;
-  return { phases, level: L, reps, explain };
+  const desc = ph.map((p, i) => `P${i + 1} ${p.reps} Wdh./${p.restSec} s${p.rounds ? ' × ' + p.rounds : ' bis Ende'}`).join(' · ');
+  const explain = `Satz = ${pct} % × Max ${max} = ${reps} Wdh. · Stufe ${L.name} (${range}) · ${desc}`;
+  return { phases: ph, level: L, reps, explain, secPerRep: spr };
 }
-export function applyAutoPlan(w, max) {
+export function applyAutoPlan(w, max, secPerRep) {
   if (!w.auto?.enabled || !max) return w;
-  w.phases = planFromMax(w.exercise, max, w.auto).phases; return w;
+  w.phases = planFromMax(w.exercise, max, { ...w.auto, limitMin: w.limitMin, secPerRep }).phases; return w;
 }
 /** Neutest vorschlagen: Bestwert deutlich gestiegen (≥ 10 %) oder letzter Test älter als 28 Tage. */
 export function retestAdvice({ total, prevBest, aborted }, lastMax, nowMs) {
@@ -67,7 +86,8 @@ export function normalizeWorkout(w) {
     adapt: { enabled: !!a.enabled, mode: ['reps', 'rest', 'both'].includes(a.mode) ? a.mode : 'reps',
       reps: clamp(int(a.reps, 2), 1, 50), rest: clamp(int(a.rest, 5), 1, 120), minReps: clamp(int(a.minReps, 1), 1, 999) },
     countMode: w.countMode === 'tap' ? 'tap' : 'set',
-    auto: { enabled: !!w.auto?.enabled, pct: clamp(int(w.auto?.pct, 40), 20, 80), phase2: w.auto?.phase2 === 'reps' ? 'reps' : 'rest' },
+    auto: { enabled: !!w.auto?.enabled, pct: clamp(int(w.auto?.pct, 40), 20, 80), phases: w.auto?.phases === 2 ? 2 : 3,
+      variant: (w.auto?.variant ?? 'reps') === 'rest' ? 'rest' : 'reps' },
     template: !!w.template,
   };
 }
@@ -124,7 +144,7 @@ export function completeSet(s, done, now) {
     events.push({ type: 'adapt', repAdj: s.repAdj, restAdj: s.restAdj });
   }
   if (now >= s.endsAt) { finish(s, now, events, 'time'); return events; }
-  const restSec = restSecFor(s); // Pause gehört zur Runde des gerade beendeten Satzes
+  const restSec = restSecFor(s); // Pause gehört zum gerade beendeten Satz
   const p = s.phases[s.phaseIdx];
   s.round++; s.setNo++;
   if (p.rounds != null && s.round > p.rounds && s.phaseIdx < s.phases.length - 1) {
@@ -250,19 +270,6 @@ export function describe(w) {
   return w.phases.map(p => `${p.reps}×/${p.restSec}s ${p.rounds == null ? '→ Ende' : '×' + p.rounds}`).join('  ·  ');
 }
 
-export const TEMPLATES = [
-  { id: 'tpl-liegestuetz-5', template: true, name: 'Liegestütz-Dichte 5 min', exercise: 'Liegestütze', limitMin: 5,
-    phases: [{ reps: 10, restSec: 15, rounds: 6 }, { reps: 10, restSec: 20, rounds: null }], adapt: { enabled: false }, auto: { enabled: true, pct: 40, phase2: 'rest' } },
-  { id: 'tpl-liegestuetz-5b', template: true, name: 'Liegestütze 5 min – Wdh. sinken', exercise: 'Liegestütze', limitMin: 5,
-    phases: [{ reps: 10, restSec: 15, rounds: 6 }, { reps: 8, restSec: 15, rounds: null }], adapt: { enabled: true, mode: 'reps', reps: 2, minReps: 4 }, auto: { enabled: true, pct: 40, phase2: 'reps' } },
-  { id: 'tpl-kniebeugen-10', template: true, name: 'Kniebeugen-Dichte 10 min', exercise: 'Kniebeugen', limitMin: 10,
-    phases: [{ reps: 15, restSec: 15, rounds: 6 }, { reps: 15, restSec: 20, rounds: null }], adapt: { enabled: true, mode: 'rest', rest: 5 }, auto: { enabled: true, pct: 40, phase2: 'rest' } },
-  { id: 'tpl-dips-6', template: true, name: 'Dips-Dichte 6 min', exercise: 'Dips', limitMin: 6,
-    phases: [{ reps: 5, restSec: 20, rounds: 6 }, { reps: 5, restSec: 25, rounds: null }], adapt: { enabled: true, mode: 'reps', reps: 1, minReps: 2 }, auto: { enabled: true, pct: 40, phase2: 'rest' } },
-  { id: 'tpl-klimmzug-8', template: true, name: 'Klimmzug-EDT 8 min', exercise: 'Klimmzüge', limitMin: 8,
-    phases: [{ reps: 3, restSec: 30, rounds: 6 }, { reps: 3, restSec: 40, rounds: null }], adapt: { enabled: true, mode: 'both', reps: 1, rest: 10, minReps: 1 }, auto: { enabled: true, pct: 40, phase2: 'rest' } },
-].map(normalizeWorkout);
-
 // ---------- Phasen-Zeiträume ----------
 /** Geschätzte Dauer einer Wiederholung in Sekunden je Übung (inkl. kurzer Umkehrpunkte). */
 export const SEC_PER_REP = { 'Liegestütze': 2, 'Kniebeugen': 2, 'Dips': 2.5, 'Klimmzüge': 3, _: 2.5 };
@@ -317,13 +324,13 @@ export function phaseTimeline(src, secPerRep = 2, now = null) {
   return out;
 }
 export const mmss = ms => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
-/** "Phase 1 · 0:00–3:30 · 10 Wdh / 15 s Pause, Runden 1–6" */
+/** "Phase 1 · 0:00–2:20 · 10 Wdh / 15 s Pause, Sätze 1–4" */
 export function phaseLabel(o) {
   if (!o.reached) return `Phase ${o.idx + 1} · nicht erreicht · ${o.reps} Wdh / ${o.restSec} s Pause`;
-  const r = o.firstRound === o.lastRound ? `Runde ${o.firstRound}` : `Runden ${o.firstRound}–${o.lastRound}`;
+  const r = o.firstRound === o.lastRound ? `Satz ${o.firstRound}` : `Sätze ${o.firstRound}–${o.lastRound}`;
   return `Phase ${o.idx + 1} · ${mmss(o.start)}–${mmss(o.end)} · ${o.reps} Wdh / ${o.restSec} s Pause, ${r}`;
 }
-/** Erste fortlaufende Runde jeder Phase (aus den Rundenzahlen). */
+/** Erste fortlaufende Satznummer jeder Phase (aus den Satzzahlen). */
 export function phaseStartRounds(phases) {
   const r = []; let n = 1;
   for (const p of phases) { r.push(n); n += p.rounds ?? 0; }
@@ -334,12 +341,12 @@ export function phaseStartRounds(phases) {
 /**
  * Regel (pro Übung, für die nächste Einheit):
  *  - Abgebrochen oder < 3 volle Sätze → kein Vorschlag.
- *  - Erster nicht geschaffter Satz (Runde X, Teilsatz am Zeitende zählt nicht) in Phase k:
- *      A) gibt es eine Folgephase und X−1 > Start(k): Phase k+1 beginnt ab Runde X−1 (Phase k hat X−1−Start(k) Runden).
+ *  - Erster nicht geschaffter Satz (Satz X, Teilsatz am Zeitende zählt nicht) in Phase k:
+ *      A) gibt es eine Folgephase und X−1 > Start(k): Phase k+1 beginnt ab Satz X−1 (Phase k hat X−1−Start(k) Sätze).
  *      B) sonst bzw. als Alternative: Wdh. in Phase k um 10 % senken (mind. −1, mind. 1 Wdh.).
- *      Nur eine Phase und X−1 ≥ 2: A) = ab Runde X−1 neue Phase 2 mit 80 % der Wdh.
+ *      Nur eine Phase und X−1 ≥ 2: A) = ab Satz X−1 neue Phase 2 mit 80 % der Wdh.
  *  - Alle Sätze „geschafft“ (kein „knapp“, kein „nicht geschafft“):
- *      Phase 2 erreicht: A) Phase 2 startet 2 Runden später, B) Pause der Phase 2 um 5 s kürzer (nicht unter Pause Phase 1).
+ *      Phase 2 erreicht: A) Phase 2 startet 2 Sätze später, B) Pause der Phase 2 um 5 s kürzer (nicht unter Pause Phase 1).
  *      Phase 2 nicht erreicht oder nur eine Phase: Pause Phase 1 um 5 s kürzer (mind. 5 s).
  *  - Sonst (einzelne „knapp“): Plan beibehalten.
  */
@@ -356,23 +363,23 @@ export function suggestTune({ sets, phases, aborted }) {
     const X = fail.n, k = fail.phase;
     if (k < P.length - 1 && X - 1 > starts[k]) {
       const q = cl(); q[k].rounds = X - 1 - starts[k];
-      opts.push({ key: 'earlier', phases: q, text: `Phase ${k + 2} ab Runde ${X - 1} statt ${starts[k + 1]}` });
+      opts.push({ key: 'earlier', phases: q, text: `Phase ${k + 2} ab Satz ${X - 1} statt ${starts[k + 1]}` });
     } else if (P.length === 1 && X - 1 >= 2 && P.length < MAX_PHASES) {
       const q = cl(); q[0].rounds = X - 2; q.push({ reps: Math.max(1, Math.round(P[0].reps * 0.8)), restSec: P[0].restSec, rounds: null });
-      opts.push({ key: 'split', phases: q, text: `Ab Runde ${X - 1} neue Phase 2 mit ${q[1].reps} Wdh.` });
+      opts.push({ key: 'split', phases: q, text: `Ab Satz ${X - 1} neue Phase 2 mit ${q[1].reps} Wdh.` });
     }
     if (P[k].reps > 1) {
       const q = cl(); q[k].reps = Math.max(1, P[k].reps - Math.max(1, Math.round(P[k].reps * 0.1)));
       opts.push({ key: 'reps', phases: q, text: `Phase ${k + 1}: ${q[k].reps} statt ${P[k].reps} Wdh.` });
     }
-    if (!opts.length) return { kind: 'keep', round: X, phase: k, text: `Runde ${X} nicht geschafft, Plan ist bereits am Minimum.`, options: [] };
-    return { kind: 'harder', round: X, phase: k, text: `Ab Runde ${X} (Phase ${k + 1}) nicht geschafft.`, options: opts };
+    if (!opts.length) return { kind: 'keep', round: X, phase: k, text: `Satz ${X} nicht geschafft, Plan ist bereits am Minimum.`, options: [] };
+    return { kind: 'harder', round: X, phase: k, text: `Ab Satz ${X} (Phase ${k + 1}) nicht geschafft.`, options: opts };
   }
   if (full.every(x => rateOf(x) === 'ok')) {
     const reached2 = P.length > 1 && full.some(x => x.phase >= 1);
     if (reached2) {
       const q = cl(); q[0].rounds = Math.min(99, P[0].rounds + 2);
-      opts.push({ key: 'later', phases: q, text: `Phase 2 ab Runde ${starts[1] + 2} statt ${starts[1]}` });
+      opts.push({ key: 'later', phases: q, text: `Phase 2 ab Satz ${starts[1] + 2} statt ${starts[1]}` });
       if (P[1].restSec - 5 >= P[0].restSec && P[1].restSec >= 5) {
         const q2 = cl(); q2[1].restSec = P[1].restSec - 5;
         opts.push({ key: 'rest2', phases: q2, text: `Phase 2: Pause ${q2[1].restSec} s statt ${P[1].restSec} s` });
@@ -393,3 +400,14 @@ export function scaleTune(tune, max) {
   if (!tune || !tune.max || !max || tune.max === max) return tune;
   return { ...tune, max, phases: tune.phases.map(p => ({ ...p, reps: Math.max(1, Math.round(p.reps * max / tune.max)) })) };
 }
+
+// Vorlagen: Phasen = Plan aus einem typischen Mittel-Maximum (werden nach dem Fitnesstest neu berechnet).
+const tpl = (id, name, exercise, limitMin, max, auto, adapt) =>
+  ({ id, template: true, name, exercise, limitMin, phases: planFromMax(exercise, max, { ...auto, limitMin }).phases, adapt, auto: { enabled: true, ...auto } });
+export const TEMPLATES = [
+  tpl('tpl-liegestuetz-5', 'Liegestütz-EDT 5 min', 'Liegestütze', 5, 25, { pct: 40, variant: 'reps' }, { enabled: false }),
+  tpl('tpl-liegestuetz-5b', 'Liegestütze 5 min – Pausen steigen', 'Liegestütze', 5, 25, { pct: 40, variant: 'rest' }, { enabled: true, mode: 'reps', reps: 2, minReps: 4 }),
+  tpl('tpl-kniebeugen-10', 'Kniebeugen-EDT 10 min', 'Kniebeugen', 10, 35, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'rest', rest: 5 }),
+  tpl('tpl-dips-6', 'Dips-EDT 6 min', 'Dips', 6, 12, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'reps', reps: 1, minReps: 2 }),
+  tpl('tpl-klimmzug-8', 'Klimmzug-EDT 8 min', 'Klimmzüge', 8, 8, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'both', reps: 1, rest: 10, minReps: 1 }),
+].map(normalizeWorkout);

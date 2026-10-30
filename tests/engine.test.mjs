@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import * as E from '../src/engine.js';
 
 const S = 1000;
-const base = () => E.TEMPLATES[0]; // 5 min; 10/15s ×6; 10/20s bis Ende
+// Fester 2-Phasen-Plan für die Ablauf-Tests (5 min; 10/15 s ×6; 10/20 s bis Ende)
+const base = () => E.normalizeWorkout({ id: 't', name: 'Test', exercise: 'Liegestütze', limitMin: 5, phases: [{ reps: 10, restSec: 15, rounds: 6 }, { reps: 10, restSec: 20 }] });
 
 test('normalize: letzte Phase immer "bis Ende", Grenzen werden eingehalten', () => {
   const w = E.normalizeWorkout({ limitMin: 99, phases: [{ reps: 0, restSec: -3, rounds: null }, { reps: 5, restSec: 10, rounds: 4 }] });
@@ -12,7 +13,7 @@ test('normalize: letzte Phase immer "bis Ende", Grenzen werden eingehalten', () 
   assert.equal(w.phases[1].rounds, null);
 });
 
-test('Phasenwechsel nach 6 Runden: Pause 15 s → 20 s', () => {
+test('Phasenwechsel nach 6 Sätzen: Pause 15 s → 20 s', () => {
   let now = 0; const { state: s } = E.createSession(base(), now);
   const rests = [];
   for (let i = 0; i < 8; i++) {
@@ -130,33 +131,56 @@ test('Abschluss nach Zeitende per completeSet zählt nicht über das Limit hinau
   assert.equal(s.status, 'done'); assert.equal(s.sets[0].end, 300 * S); assert.ok(ev.some(e => e.type === 'done'));
 });
 
-test('Einstufung: Max 25 Liegestütze → 10 Wdh., 15 s ×6, dann 20 s (Beispiel des Nutzers)', () => {
+test('Fitnesstest: Max 25 Liegestütze → 3 Phasen 10/15 s ×4, 10/20 s ×2, 8/20 s bis Ende', () => {
   const p = E.planFromMax('Liegestütze', 25);
   assert.equal(p.level.name, 'Mittel');
-  assert.deepEqual(p.phases, [{ reps: 10, restSec: 15, rounds: 6 }, { reps: 10, restSec: 20, rounds: null }]);
+  assert.deepEqual(p.phases, [{ reps: 10, restSec: 15, rounds: 4 }, { reps: 10, restSec: 20, rounds: 2 }, { reps: 8, restSec: 20, rounds: null }]);
   assert.match(p.explain, /40 % × Max 25 = 10 Wdh/);
 });
 
-test('Einstufung: Einsteiger längere Pausen, Fortgeschritten kürzer; mind. 1 Wdh.', () => {
+test('Fitnesstest: Einsteiger längere Pausen, Fortgeschritten kürzer; mind. 1 Wdh.', () => {
   const beg = E.planFromMax('Liegestütze', 8), adv = E.planFromMax('Liegestütze', 50);
   assert.equal(beg.level.name, 'Einsteiger'); assert.equal(adv.level.name, 'Fortgeschritten');
   assert.ok(beg.phases[0].restSec > adv.phases[0].restSec);
-  assert.equal(beg.phases[0].rounds, 5); assert.equal(adv.phases[0].rounds, 8);
+  assert.equal(beg.phases.length, 3); assert.equal(adv.phases[2].reps, 16);
   assert.equal(E.planFromMax('Klimmzüge', 1).reps, 1);
   assert.equal(E.planFromMax('Liegestütze', 50).reps, 20);
 });
 
-test('Einstufung: Klimmzüge/Dips mit Pausenfaktor, Phase 2 wahlweise weniger Wdh.', () => {
+test('Fitnesstest: Klimmzüge/Dips mit Pausenfaktor; Variante Pause länger; 2 Phasen wählbar', () => {
   const k = E.planFromMax('Klimmzüge', 8); // Mittel: 15 s × 1,5 → 25 s (auf 5 s gerundet)
-  assert.equal(k.phases[0].restSec, 25); assert.equal(k.phases[1].restSec, 30);
-  const r = E.planFromMax('Liegestütze', 25, { pct: 50, phase2: 'reps' });
+  assert.deepEqual(k.phases.map(p => p.restSec), [25, 30, 30]);
+  assert.deepEqual(E.planFromMax('Liegestütze', 25, { variant: 'rest' }).phases.map(p => [p.reps, p.restSec]), [[10, 15], [10, 20], [10, 25]]);
+  const r = E.planFromMax('Liegestütze', 25, { pct: 50, phases: 2 });
   assert.deepEqual(r.phases.map(p => [p.reps, p.restSec]), [[13, 15], [10, 15]]);
+});
+
+test('Fitnesstest: alle 3 Phasen werden im Zeitlimit erreicht (Übungen × Maxima × Zeitlimits)', () => {
+  for (const ex of E.EXERCISES) for (const max of [1, 3, 8, 12, 25, 40, 60]) for (const limitMin of [3, 5, 8, 10, 20]) {
+    const p = E.planFromMax(ex, max, { limitMin });
+    if (p.reps * E.secPerRepFor(ex) > limitMin * 60 / 5) continue; // ein Satz > 1/5 des Limits: drei Phasen nicht sinnvoll (z. B. 60 Klimmzüge in 3 min)
+    const w = E.normalizeWorkout({ exercise: ex, limitMin, phases: p.phases });
+    const tl = E.phaseTimeline(w, E.secPerRepFor(ex));
+    assert.equal(tl.length, 3);
+    assert.ok(tl.every(o => o.reached), `${ex} max ${max} ${limitMin} min: ${tl.map(E.phaseLabel).join(' | ')}`);
+    if (p.phases[0].rounds > 1 || p.phases[1].rounds > 1) assert.ok(tl[2].end - tl[2].start >= limitMin * 60000 * 0.15, `${ex} ${max} ${limitMin}: Phase 3 zu kurz`);
+  }
+});
+
+test('Fitnesstest: Tempo aus dem Test verschiebt die Satzzahlen, Vorlagen sind 3-phasig', () => {
+  const slow = E.planFromMax('Liegestütze', 25, { secPerRep: 3.5 }), fast = E.planFromMax('Liegestütze', 25, { secPerRep: 1.2 });
+  assert.ok(slow.phases[0].rounds < fast.phases[0].rounds);
+  for (const t of E.TEMPLATES) {
+    assert.equal(t.phases.length, 3, t.name);
+    assert.ok(E.phaseTimeline(t, E.secPerRepFor(t.exercise)).every(o => o.reached), t.name);
+  }
 });
 
 test('Auto-Plan wird nur bei aktivierter Option auf ein Workout angewendet', () => {
   const w = E.normalizeWorkout({ exercise: 'Liegestütze', phases: [{ reps: 3, restSec: 60 }], auto: { enabled: false } });
   E.applyAutoPlan(w, 40); assert.equal(w.phases[0].reps, 3);
-  w.auto.enabled = true; E.applyAutoPlan(w, 40); assert.equal(w.phases[0].reps, 16); assert.equal(w.phases.length, 2);
+  w.auto.enabled = true; E.applyAutoPlan(w, 40); assert.equal(w.phases[0].reps, 16); assert.equal(w.phases.length, 3);
+  w.auto.phases = 2; E.applyAutoPlan(w, 40); assert.equal(w.phases.length, 2);
 });
 
 test('Neutest-Empfehlung: +10 % über Bestwert oder Test älter als 28 Tage', () => {
@@ -170,13 +194,14 @@ test('Neutest-Empfehlung: +10 % über Bestwert oder Test älter als 28 Tage', ()
 // ---------- Phasen-Zeiträume ----------
 const mid25 = () => E.normalizeWorkout({ ...E.TEMPLATES[0], phases: E.planFromMax('Liegestütze', 25).phases });
 
-test('Zeiträume: Liegestütze Max 25 (Mittel), 2 s/Wdh. → 0:00–3:30 Runden 1–6, 3:30–5:00 Runden 7–9', () => {
+test('Zeiträume: Liegestütze Max 25 (Mittel), 2 s/Wdh., 5 min → drei Phasen bis 5:00', () => {
   const tl = E.phaseTimeline(mid25(), E.secPerRepFor('Liegestütze'));
   assert.deepEqual(tl.map(E.phaseLabel), [
-    'Phase 1 · 0:00–3:30 · 10 Wdh / 15 s Pause, Runden 1–6',
-    'Phase 2 · 3:30–5:00 · 10 Wdh / 20 s Pause, Runden 7–9',
+    'Phase 1 · 0:00–2:20 · 10 Wdh / 15 s Pause, Sätze 1–4',
+    'Phase 2 · 2:20–3:40 · 10 Wdh / 20 s Pause, Sätze 5–6',
+    'Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9',
   ]);
-  assert.equal(tl[1].end, 5 * 60000); // letzte Phase endet beim Zeitlimit
+  assert.equal(tl[2].end, 5 * 60000); // letzte Phase endet beim Zeitlimit
 });
 
 test('Zeiträume: Tempo-Konstanten je Übung; Phase außerhalb des Zeitlimits = nicht erreicht', () => {
@@ -213,27 +238,27 @@ const mk = (rates, phases = P2) => {
   return rates.map(r => { n++; const ph = st.findLastIndex(x => x <= n); return { n, phase: ph, round: n - st[ph] + 1, target: 10, done: r === 'fail' ? 7 : 10, rate: r }; });
 };
 
-test('Anpassung: alles geschafft → Phase 2 zwei Runden später oder Pause Phase 2 −5 s', () => {
+test('Anpassung: alles geschafft → Phase 2 zwei Sätze später oder Pause Phase 2 −5 s', () => {
   const sg = E.suggestTune({ sets: mk(Array(9).fill('ok')), phases: P2 });
   assert.equal(sg.kind, 'easier');
   assert.deepEqual(sg.options.map(o => o.key), ['later', 'rest2']);
-  assert.equal(sg.options[0].phases[0].rounds, 8); assert.equal(sg.options[0].text, 'Phase 2 ab Runde 9 statt 7');
+  assert.equal(sg.options[0].phases[0].rounds, 8); assert.equal(sg.options[0].text, 'Phase 2 ab Satz 9 statt 7');
   assert.equal(sg.options[1].phases[1].restSec, 15);
   // Phase 2 nicht erreicht → Pause Phase 1 kürzer
   const sg2 = E.suggestTune({ sets: mk(Array(5).fill('ok')), phases: P2 });
   assert.deepEqual(sg2.options.map(o => [o.key, o.phases[0].restSec]), [['rest1', 10]]);
 });
 
-test('Anpassung: ab Runde X nicht geschafft → Phase 2 ab Runde X−1 oder Wdh. dort senken', () => {
+test('Anpassung: ab Satz X nicht geschafft → Phase 2 ab Satz X−1 oder Wdh. dort senken', () => {
   const sg = E.suggestTune({ sets: mk(['ok', 'ok', 'ok', 'hard', 'fail', 'fail', 'ok']), phases: P2 });
   assert.equal(sg.kind, 'harder'); assert.equal(sg.round, 5);
-  assert.equal(sg.options[0].key, 'earlier'); assert.equal(sg.options[0].phases[0].rounds, 3); // Phase 2 ab Runde 4
+  assert.equal(sg.options[0].key, 'earlier'); assert.equal(sg.options[0].phases[0].rounds, 3); // Phase 2 ab Satz 4
   assert.equal(E.phaseStartRounds(sg.options[0].phases)[1], 4);
   assert.equal(sg.options[1].key, 'reps'); assert.equal(sg.options[1].phases[0].reps, 9);
   // Fehler in der letzten Phase → dort Wdh. senken
   const sg2 = E.suggestTune({ sets: mk([...Array(7).fill('ok'), 'fail']), phases: P2 });
   assert.deepEqual(sg2.options.map(o => [o.key, o.phases[1].reps]), [['reps', 9]]);
-  // nur eine Phase → ab Runde X−1 neue Phase 2 mit 80 %
+  // nur eine Phase → ab Satz X−1 neue Phase 2 mit 80 %
   const one = [{ reps: 10, restSec: 15, rounds: null }];
   const sg3 = E.suggestTune({ sets: mk(['ok', 'ok', 'ok', 'ok', 'fail'], one), phases: one });
   assert.deepEqual(sg3.options[0].phases, [{ reps: 10, restSec: 15, rounds: 3 }, { reps: 8, restSec: 15, rounds: null }]);
@@ -248,7 +273,7 @@ test('Anpassung: knapp → beibehalten; abgebrochen, Teilsatz und < 3 Sätze →
 });
 
 test('Satz-Bewertung: Standard aus Wdh., manuell überschreibbar, Korrektur aktualisiert', () => {
-  const { state: s } = E.createSession(E.TEMPLATES[0], 0);
+  const { state: s } = E.createSession(base(), 0);
   E.completeSet(s, 10, 20000); assert.equal(s.sets[0].rate, 'ok');
   E.rateLastSet(s, 'hard'); assert.equal(s.sets[0].rate, 'hard');
   E.editLastSet(s, 8); assert.equal(s.sets[0].rate, 'fail');
@@ -260,4 +285,14 @@ test('Gespeicherte Anpassung wird auf neues Maximum umgerechnet', () => {
   const t = { max: 25, phases: [{ reps: 10, restSec: 15, rounds: 8 }, { reps: 9, restSec: 20, rounds: null }] };
   assert.deepEqual(E.scaleTune(t, 30).phases.map(p => p.reps), [12, 11]);
   assert.equal(E.scaleTune(t, 25), t);
+});
+
+test('Migration RepZeit → EDT Timer: repzeit.* wird nach edt.* kopiert, vorhandene edt.* bleiben', async () => {
+  const { migrateLegacy } = await import('../src/store.js');
+  const m = new Map([['repzeit.maxes', '{"Liegestütze":[{"v":25}]}'], ['repzeit.history', '[{"id":"x"}]'], ['edt.settings', '{"sound":false}'], ['repzeit.settings', '{"sound":true}']]);
+  const ls = { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)) };
+  assert.deepEqual(migrateLegacy(ls), ['history', 'maxes']);
+  assert.equal(m.get('edt.maxes'), '{"Liegestütze":[{"v":25}]}'); assert.equal(m.get('edt.settings'), '{"sound":false}');
+  assert.ok(m.has('repzeit.maxes')); assert.ok(m.has('edt.migrated'));
+  assert.deepEqual(migrateLegacy(ls), []); // nur einmal
 });

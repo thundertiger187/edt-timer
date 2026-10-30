@@ -1,7 +1,7 @@
 {
-  "name": "RepZeit – Density-Timer",
-  "short_name": "RepZeit",
-  "description": "Maximale Wiederholungen im Zeitlimit: Cluster-Sätze, Pausen, Phasen, Auto-Anpassung.",
+  "name": "EDT Timer",
+  "short_name": "EDT Timer",
+  "description": "Escalating Density Training: maximale Wiederholungen im Zeitlimit, Phasen aus dem Fitnesstest.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

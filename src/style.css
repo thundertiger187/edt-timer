@@ -243,3 +243,22 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .tlist{margin-top:10px;font-size:13px;color:#cdefff;background:rgba(56,217,255,.08);border-radius:12px;padding:10px 12px;line-height:1.6;font-variant-numeric:tabular-nums}
 .tunedone{color:var(--acc);font-weight:700}
 .chart .b.hard{fill:#e8d34a}.legend .hard{background:#e8d34a}
+/* v1.2 Fitnesstest */
+.testclock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.testclock .bigclock{font-size:min(30vw,128px)}
+.hit.stop{background:var(--bad);color:#fff;box-shadow:0 10px 40px rgba(255,92,92,.22)}
+.hit.stop span{font-size:40px}
+.howto{margin:6px 0 16px;padding-left:22px;display:grid;gap:10px;font-size:16px;line-height:1.4}
+.howto b{color:var(--acc)}
+.numin{width:130px;height:76px;text-align:center;font-size:48px;font-weight:900;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:18px;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.numin::-webkit-inner-spin-button,.numin::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.numin:focus{outline:2px solid var(--acc);outline-offset:2px}
+.testres{display:flex;justify-content:center;gap:16px;color:var(--mut);font-size:15px;margin:0 0 12px}
+.testres b{color:var(--tx);font-size:18px}
+.planbox .pl{font-size:14px;margin-top:4px}.planbox small{display:block;margin-top:6px}
+.origin{font-size:14px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:-4px 0 12px}
+.origin b{color:var(--tx)}.origin .link{color:var(--acc);padding:0 0 0 4px;text-decoration:underline}
+.setup .extiles{margin:14px 0 18px}
+.chip.need{border-style:dashed}
+.h3.first{margin-top:4px}
+.maxpanel .btn.sm{white-space:nowrap}
