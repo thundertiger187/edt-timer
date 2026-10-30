@@ -217,9 +217,10 @@ await ctx.setOffline(false);
 
 // ---------- Migration alter RepZeit-Daten + Setup überspringen ----------
 {
+  await ctx.close(); // Offline-Umschaltung oben kann gepoolte Verbindungen schließen
   const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'de-DE' }); const p2 = await c2.newPage();
   p2.on('pageerror', e => errors.push(e.message));
-  await p2.goto(base); await p2.waitForSelector('.setup');
+  for (let i = 0; ; i++) { try { await p2.goto(base); break; } catch (e) { if (i >= 2) throw e; await p2.waitForTimeout(1500); } } await p2.waitForSelector('.setup');
   await p2.click('[data-act=setup-skip]'); await p2.waitForSelector('.extiles');
   await p2.reload(); await p2.waitForSelector('.extiles'); // kein Setup mehr nach Überspringen
   ok('Setup überspringbar, erscheint danach nicht erneut');
