@@ -455,6 +455,30 @@ export function shortRestFactor(leftMs, needMs, maxCut = 0.2) {
 }
 export const reducePhases = (phases, f) => phases.map(p => ({ ...p, reps: Math.max(1, Math.round(p.reps * f)) }));
 
+// ---------- Rekord je Zeitlimit ----------
+/** Zeitlimit einer gespeicherten Einheit in Minuten. Einträge haben limitMs; ältere/importierte ggf. limitMin
+ *  oder nur workoutId (dann über info(workoutId) → { limitMin }). Unbekannt → null. */
+export function sessionLimitMin(h, info) {
+  if (!h) return null;
+  if (Number.isFinite(+h.limitMs) && +h.limitMs > 0) return Math.round(+h.limitMs / 60000);
+  if (Number.isFinite(+h.limitMin) && +h.limitMin > 0) return Math.round(+h.limitMin);
+  const w = info && h.workoutId ? info(h.workoutId) : null;
+  return w && Number.isFinite(+w.limitMin) && +w.limitMin > 0 ? Math.round(+w.limitMin) : null;
+}
+/** Höchste Gesamtzahl Wdh. einer Übung in abgeschlossenen Einheiten mit genau limitMin Minuten
+ *  (inkl. verkürzter Erholung; abgebrochene Einheiten zählen nicht). → { total, date, id } oder null. */
+export function bestForLimit(history, exercise, limitMin = 5, info) {
+  let best = null;
+  for (const h of history || []) {
+    if (!h || h.aborted) continue;
+    const ex = h.exercise ?? (info && h.workoutId ? info(h.workoutId)?.exercise : undefined);
+    const t = +h.total;
+    if (ex !== exercise || !Number.isFinite(t) || t <= 0 || sessionLimitMin(h, info) !== limitMin) continue;
+    if (!best || t > best.total) best = { total: t, date: h.date ?? null, id: h.id ?? null };
+  }
+  return best;
+}
+
 // Vorlagen: Phasen = Plan aus einem typischen Mittel-Maximum (werden nach dem Fitnesstest neu berechnet).
 const tpl = (id, name, exercise, limitMin, max, auto, adapt) =>
   ({ id, template: true, name, exercise, limitMin, phases: planFromMax(exercise, max, { ...auto, limitMin }).phases, adapt, auto: { enabled: true, ...auto } });

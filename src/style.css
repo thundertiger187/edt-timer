@@ -341,3 +341,10 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .remind .seg button{font-size:13px;padding:8px 4px}
 .muted.sm{font-size:13px;margin:6px 0 10px}
 .daypick{margin-bottom:8px}
+/* v1.4.1: Kachel-Werte – Max am Stück (Fitnesstest) und Rekord 5 min (Verlauf) */
+.exstats{display:flex;flex-direction:column;gap:1px;position:relative;z-index:1;max-width:calc(100% - 52px)}
+.exstats .exmax,.exbest{font-size:12px;line-height:1.4;white-space:nowrap;letter-spacing:-.005em}
+.exstats .exmax b,.exbest b{font-size:15px}
+.extile .tilefig{width:46px;height:40px;right:7px;bottom:9px}
+.exbest{color:var(--mut);font-weight:600}.exbest b{color:var(--tx)}
+.cardrec .exbest{font-size:13px}.cardrec .exbest b{font-size:14px}

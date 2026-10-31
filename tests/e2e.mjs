@@ -70,8 +70,11 @@ await page.evaluate(() => document.querySelector('.rechint').scrollIntoView({ bl
 await shot('24_hinweis_nach_test.png');
 // Countdown überlebt Neuladen (zeitstempelbasiert)
 await page.reload(); await page.waitForSelector('.extiles');
-const recHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exrec').textContent])));
-assert.match(recHome['Liegestütze'], /^Erholung noch (9:\d\d|10:00)$/); assert.match(recHome['Dips'], /^Erholung noch/); assert.equal(recHome['Kniebeugen'], 'erholt');
+const recHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exrec')?.textContent ?? null])));
+assert.match(recHome['Liegestütze'], /^Erholung noch (9:\d\d|10:00)$/); assert.match(recHome['Dips'], /^Erholung noch/); assert.equal(recHome['Kniebeugen'], null); assert.equal(recHome['Klimmzüge'], null);
+assert.doesNotMatch(await page.textContent('.extiles'), /erholt/);
+const statsHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exmax').textContent + ' | ' + x.querySelector('.exbest').textContent])));
+assert.equal(statsHome['Liegestütze'], 'Max am Stück 25 | Rekord 5 min –'); assert.equal(statsHome['Kniebeugen'], 'Test offen | Rekord 5 min –');
 ok('Hinweis nach Test: 10 min Pause für Brust/Trizeps/Schulter, Countdown läuft, Tagesverteilung + Vortag-Tipp', cd2);
 await page.click('[data-exsel="Klimmzüge"]'); await page.waitForSelector('.howto'); // ungetestete Übung öffnet den Test
 // nächste Übung: Klimmzüge ohne Test per Zahl
@@ -89,7 +92,7 @@ assert.match(await page.textContent('.maxbar'), /25.*Fitnesstest wiederholen/s);
 await page.waitForTimeout(500);
 await shot('07_start_nach_setup.png');
 await shot('25_start_erholungsstatus.png');
-ok('Startseite: Liegestütze/Dips „Erholung noch m:ss“, Kniebeugen/Klimmzüge „erholt“', recHome['Liegestütze']);
+ok('Startseite: Liegestütze/Dips „Erholung noch m:ss“, Kniebeugen/Klimmzüge ohne Erholungszeile (kein „erholt“), „Max am Stück 25 · Rekord 5 min –“', recHome['Liegestütze']);
 
 // ---------- Editor ----------
 await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=edit]'); await page.waitForSelector('#f-name');
@@ -184,6 +187,8 @@ assert.equal(await page.evaluate(() => __rz.history.length), histLen);
 ok('Ergebnis: „Nächstes EDT ab hh:mm“, Wechsel auf andere Muskelgruppe startet ohne Warten', otherEx);
 await page.goto(base); await page.waitForSelector('.extiles');
 assert.match(await page.textContent('.extile:has-text("Liegestütze") .exrec'), /Erholung noch/);
+assert.equal(await page.textContent('.extile:has-text("Liegestütze") .exbest'), `Rekord 5 min ${tot1}`); // nach erster 5-min-Einheit
+ok('Kachel nach 5-min-Einheit: „Rekord 5 min ' + tot1 + '“');
 await run(10 * 60000);
 await page.click('[data-exsel="Liegestütze"]');
 
@@ -210,6 +215,7 @@ await page.evaluate(() => document.querySelector('.panel.tune').scrollIntoView({
 await shot('18_vorschlag_uebernommen.png');
 await page.click('[data-go=home]'); await page.waitForSelector('.extiles');
 assert.match(await page.textContent('.card[data-id="tpl-liegestuetz-5"]'), /Phasen angepasst/);
+assert.equal(await page.textContent('.extile:has-text("Liegestütze") .exbest'), `Rekord 5 min ${Math.max(tot1, tot2)}`);
 await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await page.waitForSelector('[data-act=plan-start]');
 const l2 = await labels(); assert.match(l2[0], /Sätze 1–6/); assert.match(l2[1], /Sätze 7–/); assert.match(await page.textContent('.planhead'), /gemessen/);
 await shot('19_plan_angepasst.png');

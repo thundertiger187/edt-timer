@@ -53,8 +53,13 @@ const recOf = (exercise, kind = 'edt', muscle = muscleFor(exercise)) => E.recove
 const left = ms => fmt(ms); // m:ss, aufgerundet
 // Live-Countdown: Elemente mit data-until werden jede Sekunde aktualisiert
 const cd = (until, pre = '', done = 'erholt') => `<span class="cd" data-until="${until}" data-pre="${esc(pre)}" data-done="${esc(done)}">${pre}${left(until - now())}</span>`;
-const recState = (ex, muscle) => { const r = recOf(ex, 'edt', muscle);
-  return r.leftMs > 0 ? `<span class="exrec wait">${cd(r.until, 'Erholung noch ')}</span>` : `<span class="exrec ok">erholt</span>`; };
+// Übungskacheln (tile): nur laufende Erholung als Countdown, kein „erholt“; nach Ablauf verschwindet die Zeile beim nächsten Rendern.
+const recState = (ex, muscle, tile = false) => { const r = recOf(ex, 'edt', muscle);
+  return r.leftMs > 0 ? `<span class="exrec wait">${cd(r.until, 'Erholung noch ', tile ? '' : 'erholt')}</span>` : tile ? '' : `<span class="exrec ok">erholt</span>`; };
+// Rekord: meiste Wdh. in einer abgeschlossenen 5-min-Einheit dieser Übung (Verlauf)
+const REC_MIN = 5;
+const best5Of = ex => E.bestForLimit(st.history, ex, REC_MIN, id => workoutById(id));
+const best5Html = ex => { const b = best5Of(ex); return `<span class="exbest">Rekord ${REC_MIN} min <b>${b ? b.total : '–'}</b></span>`; };
 const DAY_TIP = 'EDT über den Tag verteilen: z. B. morgens Liegestütze, mittags Kniebeugen, abends Klimmzüge. So trainiert jede Muskelgruppe erholt.';
 const causeText = r => r.cause ? (r.cause.type === 'test' ? `Fitnesstest ${esc(r.cause.exercise)} um ${hhmm(r.cause.at)}` : `EDT ${esc(r.cause.exercise)} bis ${hhmm(r.cause.at)}`) : '';
 function watchRecovery(until, group) {
@@ -117,14 +122,14 @@ function viewHome() {
   const list = st.workouts.filter(w => own ? !E.EXERCISES.includes(w.exercise) : w.exercise === sel);
   const m = own ? null : maxOf(sel);
   const tiles = E.EXERCISES.map(ex => { const mx = maxOf(ex);
-    return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}">${figureSvg(ex, 'tilefig')}<span class="exname">${ex}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>` : 'Test offen'}</span>${recState(ex)}</button>`; }).join('');
+    return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}">${figureSvg(ex, 'tilefig')}<span class="exname">${ex}</span><span class="exstats"><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max am Stück <b>${mx.v}</b>` : 'Test offen'}</span>${best5Html(ex)}</span>${recState(ex, undefined, true)}</button>`; }).join('');
   const cards = list.map(w => {
     const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
     const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
     return `<article class="card" data-id="${w.id}">
       <div class="card-head"><span class="tag">${esc(w.exercise)}</span><span class="dur">${w.limitMin} min</span></div>
       <h3>${esc(w.name)}</h3>
-      ${E.EXERCISES.includes(w.exercise) ? '' : `<div class="cardrec">${esc(E.musclesOf(w.exercise, w.muscle).name)}: ${recState(w.exercise, w.muscle)}</div>`}
+      ${E.EXERCISES.includes(w.exercise) ? '' : (rs => `<div class="cardrec">${best5Html(w.exercise)}${rs ? ` · ${esc(E.musclesOf(w.exercise, w.muscle).name)}: ${rs}` : ''}</div>`)(recState(w.exercise, w.muscle, true))}
       <div class="phases">${ew.phases.map((p, i) => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>${i < ew.phases.length - 1 ? '<span class="arr">→</span>' : ''}`).join('')}</div>
       <div class="meta">${tn ? `<span class="pill acc">Phasen angepasst ${dShort(tn.date)}</span>` : wm ? `<span class="pill acc">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
       <div class="card-foot">

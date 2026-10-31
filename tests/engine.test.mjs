@@ -344,3 +344,30 @@ test('normalizeWorkout behält Muskelgruppe', () => {
   assert.equal(E.normalizeWorkout({ exercise: 'Plank', muscle: 'legs' }).muscle, 'legs');
   assert.equal(E.normalizeWorkout({ exercise: 'Plank', muscle: 'xx' }).muscle, 'own');
 });
+
+// ---------- v1.4.1: Rekord 5 min ----------
+const H = (id, exercise, limitMin, total, extra = {}) => ({ id, workoutId: 'w-' + exercise, exercise, date: `2026-10-2${id.length}T10:00:00.000Z`, limitMs: limitMin * 60000, total, sets: [], aborted: false, ...extra });
+test('Rekord 5 min: ohne Verlauf / ohne 5-min-Einheit → null', () => {
+  assert.equal(E.bestForLimit([], 'Liegestütze', 5), null);
+  assert.equal(E.bestForLimit(undefined, 'Liegestütze', 5), null);
+  assert.equal(E.bestForLimit([H('a', 'Liegestütze', 10, 150), H('b', 'Kniebeugen', 5, 90)], 'Liegestütze', 5), null);
+});
+test('Rekord 5 min: nach einer 5-min-Einheit = deren Summe', () => {
+  assert.deepEqual(E.bestForLimit([H('a', 'Liegestütze', 5, 88)], 'Liegestütze', 5), { total: 88, date: '2026-10-21T10:00:00.000Z', id: 'a' });
+});
+test('Rekord 5 min: höchste Summe, verkürzte Erholung zählt, andere Dauer/abgebrochen/0 nicht', () => {
+  const h = [H('a', 'Liegestütze', 5, 96), H('bb', 'Liegestütze', 5, 112, { shortRec: { pct: 12 } }), H('ccc', 'Liegestütze', 10, 180), H('dddd', 'Liegestütze', 6, 130),
+    H('eeeee', 'Liegestütze', 5, 140, { aborted: true }), H('f', 'Liegestütze', 5, 0), H('g', 'Dips', 5, 200)];
+  assert.equal(E.bestForLimit(h, 'Liegestütze', 5).total, 112);
+  assert.equal(E.bestForLimit(h, 'Liegestütze', 10).total, 180);
+});
+test('Rekord 5 min: ältere Einträge (limitMin statt limitMs, nur workoutId, ungerade limitMs)', () => {
+  const info = id => ({ 'own-b': { exercise: 'Burpees', limitMin: 5 }, 'w-lang': { exercise: 'Burpees', limitMin: 8 } })[id];
+  const h = [{ id: 'x', exercise: 'Dips', limitMin: 5, total: 41 }, { id: 'y', workoutId: 'own-b', total: 63 }, { id: 'z', workoutId: 'w-lang', total: 99 },
+    { id: 'v', exercise: 'Dips', limitMs: 300400, total: '45' }, { id: 'u', exercise: 'Dips', total: 70 }, null];
+  assert.equal(E.bestForLimit(h, 'Dips', 5).total, 45);
+  assert.equal(E.bestForLimit(h, 'Burpees', 5, info).total, 63);
+  assert.equal(E.bestForLimit(h, 'Burpees', 5), null); // ohne Workout-Info: Übung unbekannt
+  assert.equal(E.sessionLimitMin({ limitMs: 300000 }), 5); assert.equal(E.sessionLimitMin({ limitMin: 5 }), 5);
+  assert.equal(E.sessionLimitMin({ workoutId: 'w-lang' }, info), 8); assert.equal(E.sessionLimitMin({}), null);
+});
