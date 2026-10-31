@@ -177,8 +177,8 @@ ok('Wochenplan in Export/Import enthalten');
   p2.on('pageerror', e => errors.push(e.message));
   for (let i = 0; ; i++) { try { await p2.goto(base); break; } catch (e) { if (i >= 2) throw e; await p2.waitForTimeout(1500); } }
   await p2.waitForSelector('.setup');
-  await p2.evaluate(() => localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, planVer: 2, exSel: 'Liegestütze', asked: ['Liegestütze'] })));
-  await p2.reload(); await p2.waitForSelector('.extiles');
+  await p2.evaluate(() => localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, planVer: 2, exSel: 'Liegestütze', asked: ['Liegestütze'], anim: 'auto' })));
+  await p2.reload(); await p2.waitForSelector('.extiles'); // v1.6.1: Einstellung „Automatisch“ folgt dem System
   assert.equal(await p2.$$eval('.extile svg.fig.static', e => e.length), 4);
   assert.equal(await p2.$$eval('svg.fig[data-anim]', e => e.length), 0);
   assert.equal(await p2.$$eval('.extile svg.fig.static .fbody.ghost', e => e.length), 4);
@@ -186,7 +186,7 @@ ok('Wochenplan in Export/Import enthalten');
   await p2.goto(base + '?w=tpl-liegestuetz-5'); await p2.waitForSelector('svg.fig.planfig.static');
   assert.equal(await p2.$$eval('svg.fig[data-anim]', e => e.length), 0);
   await c2.close();
-  ok('prefers-reduced-motion: statisch Start (blass) + Endposition, keine Animation');
+  ok('prefers-reduced-motion + Animationen „Automatisch“: statisch Start (blass) + Endposition, keine Figuren-Animation');
 }
 
 assert.deepEqual(errors, [], 'Konsolenfehler: ' + errors.join('; '));

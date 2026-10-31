@@ -1,0 +1,6 @@
+2026-10-31T22:33:25.442Z http://127.0.0.1:18741/
+✓ 360x640: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm – Ring 156/131 px
+✓ 375x667: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm – Ring 183/158 px
+✓ 390x844: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm – Ring 234/234 px
+✓ 412x915: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm – Ring 240/240 px
+✓ 844x390: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm – Ring 240/240 px

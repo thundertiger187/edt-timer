@@ -78,7 +78,8 @@ function bodySvg(j, cls = '') {
   const b = bodyParts(j);
   return `<g class="fbody ${cls}"><polyline data-k="torso" points="${b.torso}"/><polyline data-k="leg" points="${b.leg}"/>${b.heel ? `<polyline data-k="heel" points="${b.heel}"/>` : ''}<polyline data-k="arm" points="${b.arm}"/><circle data-k="head" cx="${f1(j.head.x)}" cy="${f1(j.head.y)}" r="${SEG.head}"/></g>`;
 }
-const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// v1.6.1: Bewegungsstufe aus html[data-motion] (Einstellung „Animationen“); ohne Angabe System folgen
+const reduced = () => { const m = typeof document !== 'undefined' && document.documentElement?.dataset?.motion; return m ? m !== 'full' : typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; };
 const NEUTRAL = `<g class="fbody neutral"><rect x="40" y="44" width="40" height="12" rx="3"/><rect x="28" y="34" width="10" height="32" rx="3"/><rect x="82" y="34" width="10" height="32" rx="3"/><rect x="20" y="40" width="7" height="20" rx="2"/><rect x="93" y="40" width="7" height="20" rx="2"/></g>`;
 
 /** SVG-Markup für eine Übung. Bei reduzierter Bewegung statisch Start (blass) + Endposition. */

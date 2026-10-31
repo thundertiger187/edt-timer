@@ -9,7 +9,14 @@ const h = crypto.createHash('sha256'); files.sort().forEach(f => h.update(fs.rea
 const ver = `${pkg.version}-${h.digest('hex').slice(0, 8)}`;
 for (const f of files) {
   const out = path.join(DIST, path.relative(SRC, f)); fs.mkdirSync(path.dirname(out), { recursive: true });
-  if (/\.(js|html|css|webmanifest)$/.test(f)) fs.writeFileSync(out, fs.readFileSync(f, 'utf8').replaceAll('__VERSION__', ver));
+  if (/\.(js|html|css|webmanifest)$/.test(f)) {
+    let txt = fs.readFileSync(f, 'utf8').replaceAll('__VERSION__', ver);
+    // v1.6.1 Cache-Busting: Skripte und CSS mit Build-Kennung laden, damit nie eine alte Datei aus dem HTTP-Cache kommt
+    const q = `?v=${ver.split('-')[1]}`;
+    if (f.endsWith('.js') && !f.endsWith('sw.js')) txt = txt.replace(/(from\s+['"]\.\/[\w-]+\.js)(['"])/g, `$1${q}$2`);
+    if (f.endsWith('.html')) txt = txt.replace(/(href="style\.css|src="app\.js)"/g, `$1${q}"`);
+    fs.writeFileSync(out, txt);
+  }
   else fs.copyFileSync(f, out);
 }
 fs.writeFileSync(path.join(DIST, '.nojekyll'), '');

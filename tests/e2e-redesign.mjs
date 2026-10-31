@@ -117,13 +117,13 @@ assert.equal(await page.$eval('.train', e => e.className), 'train st-work');
 assert.equal(await page.$$eval('#t-proj', e => e.length), 0, 'Hochrechnung erst ab Satz 3');
 for (let i = 0; i < 2; i++) { await page.click('[data-act=done]'); await page.waitForSelector('[data-act=skip]'); await page.clock.runFor(4000); await page.click('[data-act=skip]'); await page.waitForSelector('[data-act=done]'); }
 assert.equal(await page.$$eval('#t-proj', e => e.length), 1);
-const tw = await page.evaluate(() => ({ bg: getComputedStyle(document.querySelector('.train')).backgroundImage, tot: getComputedStyle(document.querySelector('#t-total')).fontSize, vs: getComputedStyle(document.querySelector('#t-vs')).fontSize }));
-assert.match(tw.bg, /198, 255, 61/); assert.ok(parseFloat(tw.tot) > parseFloat(tw.vs) * 2);
+const tw = await page.evaluate(() => ({ bg: (() => { const fb = document.getElementById('fxbg'); const l = fb.querySelector(fb.dataset.mode === 'rest' ? '.fxl.c' : '.fxl.g'); return fb.dataset.mode + ' ' + getComputedStyle(fb).opacity + ' ' + getComputedStyle(l.querySelector('i')).backgroundImage; })(), tot: getComputedStyle(document.querySelector('#t-total')).fontSize, vs: getComputedStyle(document.querySelector('#t-vs')).fontSize }));
+assert.match(tw.bg, /^work 1 .*198, 255, 61/); // v1.6.1: Tönung über #fxbg assert.ok(parseFloat(tw.tot) > parseFloat(tw.vs) * 2);
 await shot('43_timer_satz.png');
 ok('Timer Satz: grünliche Tönung, „Wdh. gesamt“ groß, „vs. Bestwert“ klein, Hochrechnung ab Satz 3', `${tw.tot} vs ${tw.vs}`);
 await page.click('[data-act=done]'); await page.waitForSelector('[data-act=skip]'); await page.clock.runFor(3000);
-const tr = await page.evaluate(() => ({ cls: document.querySelector('.train').className, bg: getComputedStyle(document.querySelector('.train')).backgroundImage, rc: !!document.querySelector('.restbar.compact .rc .rate') && !!document.querySelector('.restbar.compact .rc .last') }));
-assert.equal(tr.cls, 'train st-rest'); assert.match(tr.bg, /56, 217, 255/); assert.ok(tr.rc);
+const tr = await page.evaluate(() => ({ cls: document.querySelector('.train').className, bg: (() => { const fb = document.getElementById('fxbg'); const l = fb.querySelector(fb.dataset.mode === 'rest' ? '.fxl.c' : '.fxl.g'); return fb.dataset.mode + ' ' + getComputedStyle(fb).opacity + ' ' + getComputedStyle(l.querySelector('i')).backgroundImage; })(), rc: !!document.querySelector('.restbar.compact .rc .rate') && !!document.querySelector('.restbar.compact .rc .last') }));
+assert.equal(tr.cls, 'train st-rest'); assert.match(tr.bg, /^rest 1 .*56, 217, 255/); assert.ok(tr.rc);
 await shot('44_timer_pause.png');
 ok('Timer Pause: cyan Tönung, Bewertung + „Letzter Satz“ kompakt in einer Box');
 await page.click('[data-act=quit]'); await page.waitForTimeout(300);

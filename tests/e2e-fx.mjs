@@ -1,6 +1,6 @@
-// E2E v1.6.0: Leuchtpunkt, Ziffern-Effekt, Karten beim Scrollen, fließender Hintergrund; reduzierte Bewegung; ohne IntersectionObserver.
+// E2E v1.6.0/1.6.1: Leuchtpunkt, Ziffern-Effekt, Karten beim Scrollen, fließender Hintergrund; reduzierte Bewegung; ohne IntersectionObserver.
 // Aufruf: node tests/e2e-fx.mjs [BASIS_URL] [--video]
-import { chromium } from 'playwright';
+import { chromium, webkit, devices } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs'; import path from 'node:path'; import assert from 'node:assert/strict';
 
@@ -23,18 +23,18 @@ const history = [
 ];
 const maxes = { 'Liegestütze': [{ v: 28, date: at(4, 17), source: 'test' }], 'Klimmzüge': [{ v: 10, date: at(9, 17), source: 'test' }], 'Kniebeugen': [{ v: 35, date: at(26, 17), source: 'input' }] };
 const plan = { entries: [{ id: 'p1', day: 5, time: '08:00', workoutId: 'tpl-liegestuetz-5' }, { id: 'p3', day: 5, time: '19:00', workoutId: 'tpl-klimmzug-8' }, { id: 'p4', day: 0, time: '18:00', workoutId: 'tpl-liegestuetz-5' }], alarmBefore: 10, remind: false, removed: [], exported: [], seq: 3 };
-async function open(opts = {}, init) {
-  const ctx = await browser.newContext({ ...CTX, ...opts });
+async function open(opts = {}, init, settings = {}, br = browser) {
+  const ctx = await br.newContext({ ...CTX, ...opts });
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage(); const errors = [];
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => m.type() === 'error' && errors.push(m.text()));
   await page.clock.install({ time: new Date(NOW) });
   await page.goto(base); await page.waitForSelector('.setup, .extiles');
-  await page.evaluate(({ history, maxes, plan }) => {
+  await page.evaluate(({ history, maxes, plan, settings }) => {
     localStorage.setItem('edt.history', JSON.stringify(history)); localStorage.setItem('edt.maxes', JSON.stringify(maxes)); localStorage.setItem('edt.plan', JSON.stringify(plan));
     const s = JSON.parse(localStorage.getItem('edt.settings') || '{}');
-    localStorage.setItem('edt.settings', JSON.stringify({ ...s, setupDone: true, dayTipSeen: true, exSel: 'Liegestütze', asked: ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge'], recNotify: false, sound: false }));
-  }, { history, maxes, plan });
+    localStorage.setItem('edt.settings', JSON.stringify({ ...s, setupDone: true, dayTipSeen: true, exSel: 'Liegestütze', asked: ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge'], recNotify: false, sound: false, ...settings }));
+  }, { history, maxes, plan, settings });
   await page.reload(); await page.waitForSelector('.extiles');
   return { ctx, page, errors };
 }
@@ -45,7 +45,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
   const { ctx, page, errors } = await open();
   // 4. Hintergrund Startseite
   const bg = await page.evaluate(() => { const b = document.querySelector('#fxbg'), i = b.querySelector('.fxl.g i'); return { mode: b.dataset.mode, anim: getComputedStyle(i).animationName, dur: getComputedStyle(i).animationDuration, op: getComputedStyle(b).opacity, z: getComputedStyle(b).zIndex, aria: b.getAttribute('aria-hidden') }; });
-  assert.equal(bg.mode, 'home'); assert.equal(bg.anim, 'fxa'); assert.ok(parseFloat(bg.dur) >= 20 && parseFloat(bg.dur) <= 40); assert.equal(bg.aria, 'true');
+  assert.equal(bg.mode, 'home'); assert.equal(bg.anim, 'fxa'); assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'full'); assert.ok(parseFloat(bg.dur) >= 20 && parseFloat(bg.dur) <= 40); assert.equal(bg.aria, 'true');
   // 3. Startseite: sichtbarer Bereich spätestens nach 300 ms sichtbar
   await page.waitForTimeout(320);
   const vis = await page.evaluate(() => [...document.querySelectorAll('.rv')].filter(e => e.getBoundingClientRect().top < innerHeight * 0.9).map(e => +getComputedStyle(e).opacity));
@@ -56,19 +56,27 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
   assert.equal(await page.$$eval('.rv:not(.rv-in)', e => e.length), 0);
   ok('Startseite: Hintergrund „home“ (fxa, 20–40 s), oben sichtbar ≤ 300 ms, Karten unten blenden beim Scrollen ein', `${bg.dur}, ${below.length} Elemente unten`);
   await page.$eval('.scroll', e => e.scrollTo(0, 0)); await page.waitForTimeout(400);
-  await shot(page, '50_start_hintergrund.png');
+  await shot(page, '65_start_hintergrund_neu.png');
   // 1. Leuchtpunkt beim pointerdown (Maus gedrückt halten, damit kein Klick auslöst)
   const box = await page.locator('.extile[data-exsel="Liegestütze"]').boundingBox();
   await page.mouse.move(box.x + 60, box.y + 50); await page.mouse.down();
   const g = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.getPropertyValue('--gx'), gy: e.style.getPropertyValue('--gy'), pe: getComputedStyle(e).pointerEvents }; });
   assert.ok(g, 'Glow-Element nach pointerdown'); assert.equal(g.cls, 'fx-glow cyan'); assert.equal(g.gx, '60px'); assert.equal(g.gy, '50px'); assert.equal(g.pe, 'none');
-  await page.waitForTimeout(140); await shot(page, '51_glow.png');
+  await page.waitForTimeout(150); await shot(page, '64_glow_neu.png');
   await page.mouse.up(); await page.waitForSelector('#xp-panel'); // Tippen funktioniert weiter
   await page.waitForTimeout(800);
   assert.equal(await page.$$eval('.fx-glow', e => e.length), 0, 'Glow verschwindet');
   const gb = await page.locator('.nx .go').boundingBox();
   await page.mouse.move(gb.x + 30, gb.y + 20); await page.mouse.down();
   assert.equal(await page.$eval('.fx-glow', e => e.className), 'fx-glow green filled'); await page.mouse.move(gb.x + 30, gb.y - 300); await page.mouse.up();
+  // echter Touch (hasTouch/isMobile): touchscreen.tap auf eine Karte → Glow
+  await page.waitForTimeout(700);
+  const tb = await page.locator('.extile[data-exsel="Kniebeugen"]').boundingBox();
+  await page.touchscreen.tap(tb.x + 40, tb.y + 30);
+  const tg = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.getPropertyValue('--gx'), a: getComputedStyle(e, '::after').animationName, d: getComputedStyle(e, '::after').animationDuration }; });
+  assert.ok(tg, 'Glow nach touchscreen.tap'); assert.equal(tg.cls, 'fx-glow cyan'); assert.equal(tg.gx, '40px'); assert.equal(tg.a, 'fxglow'); assert.equal(tg.d, '0.6s');
+  await page.waitForSelector('#xp-panel[data-panel="Kniebeugen"]');
+  ok('Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,6 s, Panel öffnet', `--gx ${tg.gx}`);
   ok('Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt', `--gx ${g.gx} --gy ${g.gy}`);
   // 2. Ziffern-Effekt im Ergebnis (Verlauf → neueste Einheit, neuer Rekord 5 min)
   await page.click('.tab[data-go=history]'); await page.waitForSelector('.hitem');
@@ -123,22 +131,110 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
   await ctx.close();
 }
 
-// ===== reduzierte Bewegung =====
-{
-  const { ctx, page, errors } = await open({ reducedMotion: 'reduce' });
-  const r = await page.evaluate(() => ({ rv: document.querySelectorAll('.rv').length, anim: getComputedStyle(document.querySelector('#fxbg .fxl i')).animationName }));
-  assert.equal(r.rv, 0); assert.equal(r.anim, 'none');
-  const box = await page.locator('.extile[data-exsel="Liegestütze"]').boundingBox();
-  await page.mouse.move(box.x + 40, box.y + 40); await page.mouse.down();
-  assert.equal(await page.$$eval('.fx-glow', e => e.length), 0); await page.mouse.up();
+// ===== System „Bewegung reduzieren“: Einstellung An (Standard) / Automatisch (sanft) / Aus =====
+const tapTile = async (page, ex) => { const b = await page.locator(`.extile[data-exsel="${ex}"]`).boundingBox(); await page.touchscreen.tap(b.x + 40, b.y + 40); return page.evaluate(() => { const e = document.querySelector('.fx-glow'); return e ? getComputedStyle(e, '::after').animationName : null; }); };
+const resultState = async page => {
   await page.click('.tab[data-go=history]'); await page.waitForSelector('.hitem');
-  assert.equal(await page.$$eval('.rv', e => e.length), 0);
+  const rv = await page.$$eval('.rv', e => e.length), rvT = await page.$$eval('.rv', e => e.length ? getComputedStyle(e[0]).transform : null);
   await page.click('.hitem[data-hist="rec"]'); await page.waitForSelector('.hero .huge');
-  const h = await page.evaluate(() => ({ scr: document.querySelectorAll('[data-scr], .scr').length, text: document.querySelector('.hero .huge').textContent, flash: document.querySelector('.hero').classList.contains('flash'), badge: document.querySelector('.badge.big').textContent }));
-  assert.deepEqual(h, { scr: 0, text: '123', flash: false, badge: 'Neuer Rekord · 5 min · vorher 117' });
+  const h = await page.evaluate(() => ({ scr: document.querySelectorAll('.scr').length, text: document.querySelector('.hero .huge').textContent }));
+  return { rv, rvT, ...h };
+};
+{ // Standard „An“ + System reduziert → volle Effekte (Einstellung überstimmt)
+  const { ctx, page, errors } = await open({ reducedMotion: 'reduce' });
+  const st = await page.evaluate(() => ({ m: document.documentElement.dataset.motion, a: getComputedStyle(document.querySelector('#fxbg .fxl i')).animationName }));
+  assert.deepEqual([st.m, st.a], ['full', 'fxa']);
+  assert.equal(await tapTile(page, 'Kniebeugen'), 'fxglow');
+  const r = await resultState(page); assert.ok(r.rv > 3); assert.notEqual(r.rvT, 'none'); assert.equal(r.scr, 4); assert.equal(r.text, '123');
   assert.deepEqual(errors, []);
-  ok('Reduzierte Bewegung: kein Glow, keine Einblendung, kein Ziffern-Effekt/Leuchten, Hintergrund statisch (animation none)');
+  ok('System „Bewegung reduzieren“ + Einstellung An (Standard): alle Effekte aktiv', `motion ${st.m}`);
   await ctx.close();
+}
+{ // Automatisch + System reduziert → nur Überblendungen
+  const { ctx, page, errors } = await open({ reducedMotion: 'reduce' }, null, { anim: 'auto' });
+  const st = await page.evaluate(() => { const i = document.querySelector('#fxbg .fxl i'); return { m: document.documentElement.dataset.motion, a: getComputedStyle(i).animationName, t: getComputedStyle(i).transform, fig: document.querySelectorAll('svg.fig.static').length, anyFig: document.querySelectorAll('svg.fig').length }; });
+  assert.equal(st.m, 'gentle'); assert.equal(st.a, 'fxbreath'); assert.equal(st.t, 'none'); assert.equal(st.fig, st.anyFig);
+  assert.equal(await tapTile(page, 'Kniebeugen'), 'fxglowfade');
+  const r = await resultState(page); assert.ok(r.rv > 3); assert.equal(r.rvT, 'none'); assert.equal(r.scr, 4); assert.equal(r.text, '123');
+  await page.clock.runFor(1500); assert.equal(await page.$$eval('.scr', e => e.length), 0);
+  assert.deepEqual(errors, []);
+  ok('Automatisch + System reduziert: sanfte Stufe – Glow nur Überblendung, Einblenden ohne Versatz, Hintergrund atmet statt zu wandern, Figuren statisch, Ziffern-Effekt läuft');
+  await ctx.close();
+}
+{ // Automatisch ohne Systemvorgabe → volle Effekte
+  const { ctx, page } = await open({ reducedMotion: 'no-preference' }, null, { anim: 'auto' });
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'full');
+  ok('Automatisch ohne Systemvorgabe: volle Effekte'); await ctx.close();
+}
+{ // Aus → keine Effekte
+  const { ctx, page, errors } = await open({ reducedMotion: 'no-preference' }, null, { anim: 'off' });
+  const st = await page.evaluate(() => ({ m: document.documentElement.dataset.motion, a: getComputedStyle(document.querySelector('#fxbg .fxl i')).animationName, rv: document.querySelectorAll('.rv').length }));
+  assert.deepEqual(st, { m: 'off', a: 'none', rv: 0 });
+  assert.equal(await tapTile(page, 'Kniebeugen'), null);
+  const r = await resultState(page); assert.equal(r.rv, 0); assert.equal(r.scr, 0); assert.equal(r.text, '123');
+  await page.clock.runFor(1500); assert.equal(await page.$eval('.hero', h => h.classList.contains('flash')), false);
+  assert.deepEqual(errors, []);
+  ok('Aus: kein Glow, keine Einblendung, kein Ziffern-Effekt/Leuchten, Hintergrund statisch (animation none)');
+  await ctx.close();
+}
+{ // Einstellung unter Mehr → Animationen
+  const { ctx, page, errors } = await open({ reducedMotion: 'reduce' });
+  await page.click('.tab[data-go=more]'); await page.waitForSelector('.animpanel');
+  const opts = await page.$$eval('[data-anim]', e => e.map(b => [b.dataset.anim, b.textContent, b.getAttribute('aria-checked')]));
+  assert.deepEqual(opts, [['auto', 'Automatisch', 'false'], ['on', 'An', 'true'], ['off', 'Aus', 'false']]);
+  assert.match(await page.textContent('#anim-info'), /überstimmt/);
+  assert.match(await page.textContent('#app-ver'), /^1\.6\.1-[0-9a-f]{8}$/);
+  await page.click('[data-anim=auto]');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'gentle');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('edt.settings')).anim), 'auto');
+  assert.match(await page.textContent('#anim-info'), /nur sanfte Überblendungen/);
+  await page.click('[data-anim=off]'); assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'off');
+  await page.click('[data-anim=on]'); assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'full');
+  await page.reload(); await page.waitForSelector('.extiles'); assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'full');
+  await page.click('.tab[data-go=more]'); await page.waitForSelector('.animpanel');
+  await page.locator('.animpanel').scrollIntoViewIfNeeded(); await page.evaluate(() => document.querySelector('.scroll').scrollBy(0, 120)); await page.waitForTimeout(400);
+  await shot(page, '63_animationen_einstellung.png');
+  assert.deepEqual(errors, []);
+  ok('Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar', await page.textContent('#app-ver'));
+  await ctx.close();
+}
+{ // Kontrast: hellster Hintergrund-Punkt über die ganze Schleife (Startseite, Satz, Pause) – grauer Text bleibt ≥ 4,5:1 (WCAG AA)
+  const { ctx, page } = await open();
+  const lin = c => (c /= 255, c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4), Lum = ([r, g, b]) => .2126 * lin(r) + .7152 * lin(g) + .0722 * lin(b);
+  const res = [];
+  for (const mode of ['home', 'work', 'rest']) {
+    await page.evaluate(m => { document.getElementById('app').style.visibility = 'hidden'; const b = document.getElementById('fxbg'); b.dataset.mode = m; b.style.transition = 'none'; b.querySelectorAll('.fxl').forEach(l => l.style.transition = 'none'); }, mode);
+    let worst = [11, 13, 16];
+    for (let t = 0; t < 76000; t += 4000) {
+      await page.evaluate(t => document.getAnimations().forEach(a => { a.pause(); a.currentTime = t; }), t);
+      const out = execFileSync('python3', ['-c', 'import sys,io\nfrom PIL import Image\nim=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert("RGB")\nc=im.getcolors(1<<24)\nprint(" ".join("%d,%d,%d"%p for n,p in c))'], { input: await page.screenshot(), maxBuffer: 1 << 26 }).toString().trim().split(' ').map(x => x.split(',').map(Number));
+      for (const px of out) if (Lum(px) > Lum(worst)) worst = px;
+    }
+    const cr = hex => { const n = parseInt(hex, 16); return (Lum([n >> 16, n >> 8 & 255, n & 255]) + .05) / (Lum(worst) + .05); };
+    const mut = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--mut').trim().slice(1));
+    res.push(`${mode}: hellster Punkt rgb(${worst}) → grau ${cr(mut).toFixed(2)}:1, weiß ${cr('f2f5f7').toFixed(2)}:1`);
+    assert.ok(cr(mut) >= 4.5, `${mode}: ${cr(mut)}`);
+    assert.ok(Lum(worst) > Lum([11, 13, 16]) * 3, `${mode}: Hintergrund sichtbar`);
+  }
+  ok('Kontrast über die ganze Hintergrund-Schleife ≥ 4,5:1 für grauen Text', res.join(' | '));
+  await ctx.close();
+}
+{ // WebKit (iPhone-Emulation): Touch-Glow, Einblendung, Hintergrund
+  let wk = null; try { wk = await webkit.launch(); } catch (e) { console.log('WebKit nicht verfügbar: ' + e.message.split('\n')[0]); }
+  if (wk) {
+    const dev = devices['iPhone 13'];
+    const { ctx, page, errors } = await open({ ...dev, deviceScaleFactor: 2 }, null, {}, wk);
+    const st = await page.evaluate(() => ({ m: document.documentElement.dataset.motion, mode: document.querySelector('#fxbg').dataset.mode, a: getComputedStyle(document.querySelector('#fxbg .fxl i')).animationName, rv: document.querySelectorAll('.rv').length }));
+    assert.deepEqual([st.m, st.mode, st.a], ['full', 'home', 'fxa']); assert.ok(st.rv > 3);
+    const b = await page.locator('.extile[data-exsel="Kniebeugen"]').boundingBox(); await page.touchscreen.tap(b.x + 30, b.y + 30);
+    assert.equal(await page.evaluate(() => document.querySelector('.fx-glow')?.className), 'fx-glow cyan');
+    await page.waitForSelector('#xp-panel[data-panel="Kniebeugen"]');
+    await page.click('.tab[data-go=history]'); await page.waitForSelector('.hitem'); await page.click('.hitem[data-hist="rec"]'); await page.waitForSelector('.hero .huge');
+    assert.equal(await page.textContent('.hero .huge'), '123');
+    assert.deepEqual(errors, []);
+    ok('WebKit/iPhone 13 (Safari-Engine): Touch-Glow bei tap, Einblendung, Hintergrund, Ergebnis exakt', dev.userAgent.match(/OS [\d_]+/)?.[0]);
+    await ctx.close(); await wk.close();
+  }
 }
 
 // ===== ohne IntersectionObserver =====
@@ -159,7 +255,7 @@ if (VIDEO) {
   const dir = fs.mkdtempSync('/tmp/edtvid-');
   const { ctx, page } = await open({ recordVideo: { dir, size: { width: 390, height: 844 } } });
   await page.waitForTimeout(1200);
-  const tap = async sel => { await page.locator(sel).first().scrollIntoViewIfNeeded(); await page.waitForTimeout(300); const b = await page.locator(sel).first().boundingBox(); await page.mouse.move(b.x + b.width * 0.4, b.y + b.height * 0.5); await page.mouse.down(); await page.waitForTimeout(160); await page.mouse.up(); };
+  const tap = async sel => { await page.locator(sel).first().scrollIntoViewIfNeeded(); await page.waitForTimeout(300); const b = await page.locator(sel).first().boundingBox(); await page.touchscreen.tap(b.x + b.width * 0.4, b.y + b.height * 0.5); };
   await tap('.extile[data-exsel="Liegestütze"]'); await page.waitForTimeout(900);
   await tap('.extile[data-exsel="Liegestütze"]'); await page.waitForTimeout(600);
   await page.$eval('.scroll', e => e.scrollTo({ top: e.scrollHeight, behavior: 'smooth' })); await page.waitForTimeout(1200);
@@ -168,7 +264,7 @@ if (VIDEO) {
   await tap('.tab[data-go=home]'); await page.waitForTimeout(900);
   await tap('.lr[data-hist="rec"]'); await page.waitForTimeout(2800);
   const v = page.video(); await ctx.close();
-  const webm = await v.path(), out = path.join(SCREENS, '1.6.0_demo.mp4');
+  const webm = await v.path(), out = path.join(SCREENS, '1.6.1_demo.mp4');
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', webm, '-vf', 'scale=390:-2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]);
   ok('Demo-Video', path.relative(ROOT, out));
 }
