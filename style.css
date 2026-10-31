@@ -484,3 +484,51 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .hchips .ph{font-size:13px;padding:5px 9px}
 .mr{padding:6px 2px}.mr .nm{flex-direction:row;gap:8px;align-items:baseline}.mr .nm small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .train.st-work,.train.st-partial{background:linear-gradient(180deg,rgba(198,255,61,.14),rgba(198,255,61,.04) 45%,transparent 75%)}
+
+/* ===== v1.6 Effekte (nur transform/opacity; bei reduzierter Bewegung aus bzw. statisch) ===== */
+#app{z-index:1}
+/* 1. Leuchtpunkt */
+.fx-layer{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
+.fx-glow{position:fixed;overflow:hidden;pointer-events:none;contain:strict}
+.fx-glow::after{content:"";position:absolute;left:calc(var(--gx) - var(--gs));top:calc(var(--gy) - var(--gs));width:calc(var(--gs) * 2);height:calc(var(--gs) * 2);border-radius:50%;
+  background:radial-gradient(circle,var(--gc) 0,transparent 62%);opacity:0;transform:scale(.35);animation:fxglow .52s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
+.fx-glow.cyan{--gc:rgba(56,217,255,.30)}
+.fx-glow.green{--gc:rgba(198,255,61,.34)}
+.fx-glow.green.filled{--gc:rgba(255,255,255,.55)}
+@keyframes fxglow{0%{opacity:0;transform:scale(.35)}18%{opacity:1}100%{opacity:0;transform:scale(1)}}
+/* 2. Ziffern-Effekt: echter Wert bleibt Text, Zufallsziffern als Pseudo-Inhalt mit leerem Alternativtext */
+.huge,.grid3 b{position:relative}
+.grid3 b{display:inline-block}
+.scr{color:transparent!important;text-shadow:none!important}
+.scr::after{content:attr(data-scr);content:attr(data-scr) / "";position:absolute;inset:0;color:var(--scr-c,var(--acc));text-align:center;white-space:nowrap}
+.grid3 b.scr::after{--scr-c:var(--tx)}
+.hero{position:relative}
+.hero::before{content:"";position:absolute;left:50%;top:50%;width:300px;height:300px;margin:-170px 0 0 -150px;border-radius:50%;background:radial-gradient(circle,rgba(198,255,61,.32),transparent 65%);opacity:0;transform:scale(.6);pointer-events:none}
+.hero.flash::before{animation:fxflash .9s ease-out}
+@keyframes fxflash{0%{opacity:0;transform:scale(.6)}30%{opacity:1}100%{opacity:0;transform:scale(1.25)}}
+.hero > *{position:relative}
+.badge.rec small{font-weight:600;opacity:.8}
+/* 3. Karten beim Scrollen (nur wenn JS .rv setzt) */
+.rv{opacity:0;transform:translateY(14px);animation:none!important}
+.rv.rv-in{opacity:1;transform:none;transition:opacity .22s ease-out var(--rvd,0ms),transform .28s cubic-bezier(.2,.8,.3,1) var(--rvd,0ms)}
+/* 4. Fließender Hintergrund */
+#fxbg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity .8s ease}
+#fxbg[data-mode=home]{opacity:1;-webkit-mask-image:linear-gradient(180deg,#000 0,#000 160px,transparent 380px);mask-image:linear-gradient(180deg,#000 0,#000 160px,transparent 380px)}
+#fxbg[data-mode=work],#fxbg[data-mode=rest]{opacity:1}
+.fxl{position:absolute;inset:0;transition:opacity 1.2s ease}
+.fxl.c{opacity:0}
+#fxbg[data-mode=rest] .fxl.g{opacity:0}#fxbg[data-mode=rest] .fxl.c{opacity:1}
+.fxl i{position:absolute;width:90vmax;height:90vmax;border-radius:50%;will-change:transform;animation:fxa 30s ease-in-out infinite alternate}
+.fxl.g i{background:radial-gradient(circle,rgba(198,255,61,.085) 0,rgba(198,255,61,.03) 35%,transparent 62%)}
+.fxl.c i{background:radial-gradient(circle,rgba(56,217,255,.10) 0,rgba(56,217,255,.035) 35%,transparent 62%)}
+.fxl i:nth-child(1){left:-45vmax;top:-50vmax}
+.fxl i:nth-child(2){left:10vmax;top:-40vmax;animation-name:fxb;animation-duration:37s}
+.fxl i:nth-child(3){left:-25vmax;top:-20vmax;animation-name:fxc;animation-duration:24s;opacity:.7}
+.fxl.c i:nth-child(1){animation-delay:-11s}.fxl.c i:nth-child(2){animation-delay:-7s}
+#fxbg[data-mode=work] .fxl i:nth-child(3),#fxbg[data-mode=rest] .fxl i:nth-child(3){top:30vmax}
+@keyframes fxa{0%{transform:translate(0,0) scale(1)}50%{transform:translate(18vmax,10vmax) scale(1.15)}100%{transform:translate(6vmax,22vmax) scale(.9)}}
+@keyframes fxb{0%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-20vmax,14vmax) scale(.92)}100%{transform:translate(-8vmax,4vmax) scale(1.2)}}
+@keyframes fxc{0%{transform:translate(0,0) scale(.9)}100%{transform:translate(24vmax,-10vmax) scale(1.1)}}
+#fxbg.paused .fxl i{animation-play-state:paused}
+.train{background-color:transparent}
+@media (prefers-reduced-motion:reduce){.fx-glow{display:none}.rv{opacity:1!important;transform:none!important}.scr{color:inherit!important}.scr::after{content:none}.hero.flash::before{animation:none}}
