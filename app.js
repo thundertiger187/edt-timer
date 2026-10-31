@@ -4,7 +4,7 @@ import { store, migrated } from './store.js';
 import { figureSvg, animateFigures } from './figures.js';
 import * as W from './week.js';
 
-const VERSION = '1.4.1-97a1e0a4';
+const VERSION = '1.5.0-59d9d7b0';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -112,45 +112,116 @@ function toast(msg) {
 const LOGO = `<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="var(--acc)"/><path d="M36 8 18 36h12l-4 20 20-30H34l2-18z" fill="#0b0d10"/></svg>`;
 
 function tabs(active) {
-  const t = [['home', 'Workouts', 'M4 10h3v4H4zM17 10h3v4h-3zM7 8h2v8H7zM15 8h2v8h-2zM9 11h6v2H9z'], ['week', 'Wochenplan', 'M7 3h1.6v2h6.8V3H17v2h2.5A1.5 1.5 0 0 1 21 6.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5v-13A1.5 1.5 0 0 1 4.5 5H7zM4.6 9.5v9.9h14.8V9.5zM7 12h3v3H7z'], ['history', 'Verlauf', 'M4 19h16v1.5H4zM6 16l4-5 3 3 5-7 1.2.9-6 8.3-3-3-3.3 4z'], ['more', 'Mehr', 'M5 11h3v3H5zM10.5 11h3v3h-3zM16 11h3v3h-3z']];
-  return `<nav class="tabs">${t.map(([v, l, d]) => `<button class="tab ${active === v ? 'on' : ''}" data-go="${v}"><svg viewBox="0 0 24 24"><path d="${d}" fill="currentColor"/></svg><span>${l}</span></button>`).join('')}</nav>`;
+  const t = [['home', 'Training', 'M4 10h3v4H4zM17 10h3v4h-3zM7 8h2v8H7zM15 8h2v8h-2zM9 11h6v2H9z'], ['week', 'Woche', 'M7 3h1.6v2h6.8V3H17v2h2.5A1.5 1.5 0 0 1 21 6.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5v-13A1.5 1.5 0 0 1 4.5 5H7zM4.6 9.5v9.9h14.8V9.5zM7 12h3v3H7z'], ['history', 'Verlauf', 'M4 19h16v1.5H4zM6 16l4-5 3 3 5-7 1.2.9-6 8.3-3-3-3.3 4z'], ['more', 'Mehr', 'M5 11h3v3H5zM10.5 11h3v3h-3zM16 11h3v3h-3z']];
+  return `<nav class="tabs">${t.map(([v, l, d]) => `<button class="tab ${active === v ? 'on' : ''}" data-go="${v}" ${active === v ? 'aria-current="page"' : ''}><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg></span><span>${l}</span></button>`).join('')}</nav>`;
 }
 
-// ---------- Startseite ----------
-function viewHome() {
-  const sel = st.settings.exSel || E.EXERCISES[0], own = sel === '__own';
-  const list = st.workouts.filter(w => own ? !E.EXERCISES.includes(w.exercise) : w.exercise === sel);
-  const m = own ? null : maxOf(sel);
-  const tiles = E.EXERCISES.map(ex => { const mx = maxOf(ex);
-    return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}">${figureSvg(ex, 'tilefig')}<span class="exname">${ex}</span><span class="exstats"><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max am Stück <b>${mx.v}</b>` : 'Test offen'}</span>${best5Html(ex)}</span>${recState(ex, undefined, true)}</button>`; }).join('');
-  const cards = list.map(w => {
-    const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
-    const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
-    return `<article class="card" data-id="${w.id}">
-      <div class="card-head"><span class="tag">${esc(w.exercise)}</span><span class="dur">${w.limitMin} min</span></div>
-      <h3>${esc(w.name)}</h3>
-      ${E.EXERCISES.includes(w.exercise) ? '' : (rs => `<div class="cardrec">${best5Html(w.exercise)}${rs ? ` · ${esc(E.musclesOf(w.exercise, w.muscle).name)}: ${rs}` : ''}</div>`)(recState(w.exercise, w.muscle, true))}
-      <div class="phases">${ew.phases.map((p, i) => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>${i < ew.phases.length - 1 ? '<span class="arr">→</span>' : ''}`).join('')}</div>
-      <div class="meta">${tn ? `<span class="pill acc">Phasen angepasst ${dShort(tn.date)}</span>` : wm ? `<span class="pill acc">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
+// ---------- Startseite (v1.5: Training) ----------
+const phaseChips = ph => ph.map(p => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>`).join('');
+const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const todayLabel = () => { const d = new Date(now()); return `${DAYS_DE[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`; };
+// Offenes Übungs-Panel (nur für diese Sitzung): Übungsname, '__own' oder null
+const openKey = () => st.openEx ?? null;
+function exTile(ex, open) {
+  const mx = maxOf(ex), b = best5Of(ex), r = recOf(ex, 'edt');
+  return `<button class="extile ${open ? 'open' : ''}" data-exsel="${ex}" aria-expanded="${open}" aria-controls="xp-panel">
+    <span class="tf">${figureSvg(ex, 'tilefig')}</span>
+    <span class="exname">${ex}</span>
+    <span class="tv"><span class="exmax ${mx ? '' : 'need'}"><small>Max am Stück</small> <b>${mx ? mx.v : 'Test offen'}</b></span><span class="exbest"><small>Rekord ${REC_MIN} min</small> <b>${b ? b.total : '–'}</b></span></span>
+    ${r.leftMs > 0 ? `<span class="exrec wait">${cd(r.until, 'Erholung noch ', '')}</span>` : '<span class="exrec ph" aria-hidden="true">&nbsp;</span>'}</button>`;
+}
+function workoutCard(w) {
+  const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
+  const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
+  const own = !E.EXERCISES.includes(w.exercise), rs = own ? recState(w.exercise, w.muscle, true) : '';
+  return `<article class="card" data-id="${w.id}">
+      <div class="card-head"><h3>${esc(w.name)}</h3><span class="dur">${w.limitMin} min</span></div>
+      ${own ? `<div class="cardrec"><span class="tag">${esc(w.exercise)}</span>${best5Html(w.exercise)}${rs ? ` · ${esc(E.musclesOf(w.exercise, w.muscle).name)}: ${rs}` : ''}</div>` : ''}
+      <div class="phases">${phaseChips(ew.phases)}</div>
+      <div class="meta">${tn ? `<span class="pill">Phasen angepasst ${dShort(tn.date)}</span>` : wm ? `<span class="pill">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
       <div class="card-foot">
         <div class="best"><small>Bestwert</small><b>${b ? b.total : '–'}</b></div>
         <div class="best"><small>Plan ≈</small><b class="dim">${plan}</b></div>
         <button class="btn ghost" data-act="edit">Bearbeiten</button>
         <button class="btn primary" data-act="start">Start</button>
       </div></article>`;
-  }).join('');
-  const maxBox = own ? '' : m
-    ? `<div class="maxbar"><div><small>Fitnesstest · Maximum</small><b>${m.v}</b> ${esc(sel)} <span class="muted">· ${dShort(m.date)}${m.source === 'test' ? ' · getestet' : ' · eingegeben'}</span></div><button class="btn ghost sm" data-act="assess" data-aex="${sel}">Fitnesstest wiederholen</button></div>`
-    : `<div class="askcard"><b>Fitnesstest ${esc(sel)}</b><p>Maximale saubere Wiederholungen bis zum Muskelversagen. Daraus entstehen Satzgröße, Pausen und 3 Phasen.</p><button class="btn primary wide" data-act="assess" data-aex="${sel}">Fitnesstest starten</button></div>`;
-  return `<header class="top"><div class="brand">${LOGO}<span>EDT Timer</span></div><div class="ver">Escalating Density Training</div></header>
-  <main class="scroll">
-    ${todayCard()}
-    <div class="extiles">${tiles}</div>
-    <button class="chip own ${own ? 'on' : ''}" data-exsel="__own">Eigene Übungen</button>
-    ${maxBox}
-    ${cards || `<p class="muted">Noch kein Workout für diese Auswahl.</p>`}
-    <button class="btn add" data-act="new">+ Neues Workout</button>
+}
+function exPanel(key, anim) {
+  const own = key === '__own', list = st.workouts.filter(w => own ? !E.EXERCISES.includes(w.exercise) : w.exercise === key);
+  const m = own ? null : maxOf(key), col = own ? 'own' : E.EXERCISES.indexOf(key) % 2 ? 'r' : 'l';
+  // Fitnesstest-Box ohne die Max-Zahl (steht schon auf der Kachel)
+  const box = own ? '' : m
+    ? `<div class="maxbar"><div><small>Fitnesstest</small><span>${dShort(m.date)} · ${m.source === 'test' ? 'getestet' : 'eingegeben'}</span></div><button class="btn ghost sm" data-act="assess" data-aex="${key}">Test wiederholen</button></div>`
+    : `<div class="askcard"><b>Fitnesstest ${esc(key)}</b><p>Maximale saubere Wiederholungen bis zum Muskelversagen. Daraus entstehen Satzgröße, Pausen und 3 Phasen.</p><button class="btn primary wide" data-act="assess" data-aex="${key}">Fitnesstest starten</button></div>`;
+  return `<div class="xpanel col-${col} ${anim ? 'anim' : ''}" id="xp-panel" data-panel="${esc(key)}"><div class="xp-in"><div class="xp-body">
+    <div class="xp-h"><b>${own ? 'Eigene Übungen' : esc(key)}</b><span>${list.length} ${list.length === 1 ? 'Workout' : 'Workouts'}</span></div>
+    ${box}
+    ${list.map(workoutCard).join('') || `<p class="muted">Noch kein Workout für diese Auswahl.</p>`}
+    <button class="btn add" data-act="new">+ Neues Workout</button></div></div></div>`;
+}
+function weekDots() {
+  const ws = W.weekStatus(st.week, st.history, new Date(now()), winfo);
+  return `<div class="wk">${ws.map(d => `<div class="${d.today ? 'today' : ''} ${d.total && d.done >= d.total ? 'full' : d.done ? 'part' : d.past && d.total ? 'miss' : ''}" title="${d.total ? `${d.done}/${d.total}` : 'frei'}">${W.DAYS[d.day]}<i></i></div>`).join('')}</div>`;
+}
+function heroCard() {
+  const d = new Date(now()), hasPlan = st.week.entries.length > 0;
+  const list = hasPlan ? W.entriesOn(st.week, W.dayIdx(d)) : [], done = hasPlan ? W.doneOn(st.week, st.history, d, winfo) : new Set();
+  const nx = hasPlan ? W.nextToday(st.week, st.history, d, winfo) : null, mins = d.getHours() * 60 + d.getMinutes();
+  let w = nx && workoutById(nx.workoutId), eyebrow;
+  if (w) eyebrow = `${toMin(nx.time) + 30 < mins ? 'Verpasst' : 'Als Nächstes'} · ${nx.time}`;
+  else {
+    const last = [...st.history].reverse().find(h => workoutById(h.workoutId));
+    w = last ? workoutById(last.workoutId) : st.workouts[0];
+    eyebrow = list.length ? 'Heute erledigt · zuletzt trainiert' : last ? 'Zuletzt trainiert' : 'Vorschlag';
+  }
+  if (!w) return `<button class="card2 nx empty" data-go="week"><b>Wochenplan anlegen</b><span>Einheiten über die Woche verteilen, mit Kalender-Erinnerung</span></button>`;
+  const ph = tuneOf(w.exercise) ? phasesOf(w) : w.phases, b = bestOf(w.id), r = recOf(w.exercise, 'edt', w.muscle);
+  const rows = list.filter(e => !nx || e.id !== nx.id).map(e => { const i = winfo(e.workoutId); if (!i) return '';
+    const isDone = done.has(e.id), late = !isDone && toMin(e.time) + 30 < mins;
+    return `<div class="mr trow ${isDone ? 'done' : late ? 'late' : ''}" data-eid="${e.id}"><span class="tm tt">${e.time}</span><span class="nm" title="${esc(i.name)}">${esc(i.exercise)}</span>
+      ${isDone ? '<span class="st ok">✓ erledigt</span>' : `<button class="st ${late ? 'late' : 'lnk'}" data-act="plan-go" data-wid="${e.workoutId}">${late ? 'verpasst · ' : ''}Start ›</button>`}</div>`; }).join('');
+  return `<div class="card2 nx" data-wid="${w.id}">
+    <div class="eyebrow">${eyebrow}</div>
+    <div class="hrow">${figureSvg(w.exercise, 'hfig')}<div class="hmain"><div class="hname">${esc(w.exercise)}</div><div class="hsub">${esc(w.name)}${b ? ` · Bestwert ${b.total}` : ''}</div></div></div>
+    <div class="phases hchips">${phaseChips(ph)}</div>
+    ${r.leftMs > 0 ? `<div class="hrec">${esc(r.group)}: ${cd(r.until, 'Erholung noch ', 'erholt')}</div>` : ''}
+    <button class="go" data-act="plan-go" data-wid="${w.id}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>${esc(w.exercise)} starten</button>
+    ${rows ? `<div class="mini">${rows}</div>` : ''}
+    ${hasPlan ? weekDots() : `<button class="hplan" data-go="week">Wochenplan anlegen ›</button>`}
+  </div>`;
+}
+function recentList() {
+  const last = [...st.history].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 2);
+  if (!last.length) return `<div class="card2 list"><p class="muted">Noch keine Einheiten.</p></div>`;
+  return `<div class="card2 list">${last.map(h => { const b = bestOf(h.workoutId), pr = b && b.id === h.id, d = new Date(h.date);
+    return `<button class="lr" data-hist="${h.id}"><div><b>${esc(h.workoutName)}</b><small>${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} · ${h.sets.length} Sätze · ${de(h.perMin)}/min${h.aborted ? ' · abgebrochen' : ''}</small></div><span class="n ${pr ? 'pr' : ''}">${h.total}${pr ? '<span class="pr-tag">BEST</span>' : ''}</span></button>`; }).join('')}</div>`;
+}
+function viewHome() {
+  const open = openKey(), anim = st.panelAnim; st.panelAnim = false;
+  const tiles = E.EXERCISES.map(ex => exTile(ex, open === ex));
+  let grid = '';
+  for (let i = 0; i < tiles.length; i += 2) {
+    grid += tiles[i] + (tiles[i + 1] || '');
+    if (open && E.EXERCISES.slice(i, i + 2).includes(open)) grid += exPanel(open, anim);
+  }
+  grid += `<button class="extile own ${open === '__own' ? 'open' : ''}" data-exsel="__own" aria-expanded="${open === '__own'}"><span>Eigene Übungen</span><span class="chev">›</span></button>`;
+  if (open === '__own') grid += exPanel('__own', anim);
+  return `<header class="hd"><h1>Training</h1><span>${todayLabel()}</span></header>
+  <main class="scroll home">
+    <section class="sec"><div class="sh"><h2>Heute</h2><button class="lk" data-go="week">Wochenplan ›</button></div>${heroCard()}</section>
+    <section class="sec"><div class="sh"><h2>Übungen</h2><button class="lk" data-act="fitness" data-then="home">Fitnesstest ›</button></div><div class="extiles">${grid}</div></section>
+    <section class="sec"><div class="sh"><h2>Zuletzt</h2><button class="lk" data-go="history">Verlauf ›</button></div>${recentList()}</section>
   </main>${tabs('home')}`;
+}
+// Auf-/Zuklappen der Übungs-Panels (eines offen); Animation nur ohne prefers-reduced-motion
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function toggleEx(key) {
+  const cur = openKey(), el = $('#xp-panel');
+  const apply = () => { st.openEx = cur === key ? null : key; if (st.openEx && st.openEx !== '__own') { st.settings.exSel = key; store.saveSettings(st.settings); } else if (st.openEx === '__own') { st.settings.exSel = '__own'; store.saveSettings(st.settings); }
+    st.panelAnim = !!st.openEx && !reducedMotion(); render();
+    if (st.openEx) requestAnimationFrame(() => { const t = $(`[data-exsel="${CSS.escape(st.openEx)}"]`); t?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }); }); };
+  // Zuklappen animiert; Wechsel auf eine andere Kachel sofort (öffnet dort animiert)
+  if (el && cur === key && !reducedMotion()) { el.classList.add('closing'); el.addEventListener('animationend', apply, { once: true }); setTimeout(() => st.openEx === cur && apply(), 400); } else apply();
 }
 
 // ---------- Wochenplan ----------
@@ -161,21 +232,6 @@ function saveWeek() { store.savePlan(st.week); }
 function weekStrip() {
   const ws = W.weekStatus(st.week, st.history, new Date(now()), winfo);
   return `<div class="wstrip">${ws.map(d => `<div class="wd ${d.today ? 'today' : ''} ${d.total && d.done >= d.total ? 'full' : d.past && d.total ? 'miss' : ''}"><b>${W.DAYS[d.day]}</b><small>${d.total ? `${d.done}/${d.total}` : '–'}</small></div>`).join('')}</div>`;
-}
-function todayCard() {
-  if (!st.week.entries.length) return `<button class="todaycard empty" data-go="week"><b>Wochenplan</b><span>Einheiten über die Woche und den Tag verteilen, mit Kalender-Erinnerung</span></button>`;
-  const d = new Date(now()), list = W.entriesOn(st.week, W.dayIdx(d)), done = W.doneOn(st.week, st.history, d, winfo), nx = W.nextToday(st.week, st.history, d, winfo);
-  const mins = d.getHours() * 60 + d.getMinutes();
-  const rows = list.map(e => { const i = winfo(e.workoutId); if (!i) return '';
-    const isDone = done.has(e.id), isNext = nx && nx.id === e.id, late = !isDone && toMin(e.time) + 30 < mins && !isNext;
-    return `<div class="trow ${isDone ? 'done' : isNext ? 'next' : late ? 'late' : ''}" data-eid="${e.id}">
-      <span class="tt">${e.time}</span>${figureSvg(i.exercise, 'rowfig')}
-      <span class="tex"><b>${esc(i.exercise)}</b><small>${esc(i.name)}</small></span>
-      <span class="tst">${isDone ? '<span class="ok">✓ erledigt</span>' : `${late ? '<small class="muted">verpasst</small>' : ''}${recState(i.exercise, i.muscle)}`}</span>
-      ${isDone ? '' : `<button class="btn ${isNext ? 'primary' : 'ghost'} sm" data-act="plan-go" data-wid="${e.workoutId}">Start</button>`}</div>`; }).join('');
-  return `<section class="panel today"><div class="panel-h"><span>Heute · ${W.DAYS_LONG[W.dayIdx(d)]}</span><button class="link" data-go="week">Wochenplan</button></div>
-    ${nx ? `<div class="tnext">Nächste Einheit: <b>${nx.time} ${esc(winfo(nx.workoutId)?.exercise || '')}</b></div>` : list.length ? `<div class="tnext ok">Alle Einheiten für heute erledigt.</div>` : `<div class="tnext">Heute nichts geplant.</div>`}
-    ${rows}${weekStrip()}</section>`;
 }
 function viewWeek() {
   const conf = W.planConflicts(st.week, winfo, recCfg()), byId = Object.fromEntries(st.week.entries.map(e => [e.id, e]));
@@ -588,9 +644,9 @@ function viewTrain() {
   const tap = s.countMode === 'tap', next = s.phases[s.phaseIdx];
   const top = `<header class="ttop"><button class="icon" data-act="quit" aria-label="Beenden">✕</button><div class="tname">${esc(s.workoutName)}</div><button class="icon" data-act="mute" aria-label="Ton">${st.settings.sound ? '🔊' : '🔇'}</button></header>
     <section class="clock"><div id="t-clock" class="bigclock">${fmt(s.endsAt - now())}</div><div class="bar"><i id="t-bar"></i>${phaseMarks(s)}</div>${phaseStrip(s)}</section>
-    <section class="stats"><div class="stat main"><div id="t-total" class="num">${E.total(s)}</div><div class="lbl">Wdh. gesamt</div></div>
-      <div class="stat"><div id="t-proj" class="num sm">–</div><div class="lbl">Hochrechnung</div></div>
-      <div class="stat"><div id="t-vs" class="num sm">–</div><div class="lbl">vs. Bestwert</div></div></section>
+    <section class="stats2"><div class="stat smain"><div id="t-total" class="num">${E.total(s)}</div><div class="lbl">Wdh. gesamt</div></div>
+      <div class="sside"><div class="stat"><span class="lbl">vs. Bestwert</span><span id="t-vs" class="num sm">–</span></div>
+      ${s.sets.length >= 2 ? `<div class="stat"><span class="lbl">Hochrechnung</span><span id="t-proj" class="num sm">–</span></div>` : ''}</div></section>
     <div class="pos">${s.status === 'rest' ? 'Nächster: ' : ''}${posText(s)}${s.shortRec ? ` · <span class="srtag">verkürzte Erholung −${s.shortRec.pct} %</span>` : ''}</div>`;
   let body = '';
   if (s.status === 'work' || s.status === 'partial') {
@@ -606,8 +662,8 @@ function viewTrain() {
     body = `<section class="rest"><div class="ringwrap"><svg class="ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rbg"/><circle id="t-ring" cx="100" cy="100" r="88" class="rfg" pathLength="1000"/></svg>
         <div class="ring-in"><div id="t-rest" class="restnum">${Math.ceil((s.restEndsAt - now()) / 1000)}</div><div class="lbl">Pause</div></div></div>
         <div class="next">Als Nächstes: <b>${s.target} Wdh.</b>${s.pendingPhase ? `<span class="badge">${phaseBadge(s)}</span>` : ''}</div></section>
-      <div class="restbar">${last && !last.partial ? `<div class="rate"><span>Satz ${last.n}</span><div class="seg">${[['ok', 'geschafft'], ['hard', 'knapp'], ['fail', 'nicht geschafft']].map(([v, l]) => `<button data-rate="${v}" class="r-${v} ${E.rateOf(last) === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>` : ''}
-        <div class="last"><span>Letzter Satz</span><button class="round sm" data-act="last-minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus">+</button></div>
+      <div class="restbar compact"><div class="rc">${last && !last.partial ? `<div class="rate"><span>Satz ${last.n}</span><div class="seg">${[['ok', 'geschafft'], ['hard', 'knapp'], ['fail', 'nicht geschafft']].map(([v, l]) => `<button data-rate="${v}" class="r-${v} ${E.rateOf(last) === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>` : ''}
+        <div class="last"><span>Letzter Satz</span><span class="lastadj"><button class="round sm" data-act="last-minus" aria-label="minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus" aria-label="plus">+</button></span></div></div>
         <button class="btn ghost wide" data-act="skip">Pause überspringen</button></div>`;
   }
   return `<div class="train st-${s.status}">${top}${body}</div>${sheetHtml()}`;
@@ -822,6 +878,65 @@ function lineChart(list) {
     ${list.map((h, i) => `<circle cx="${x(i)}" cy="${y(h.total)}" r="${i === bi ? 6 : 3.5}" class="${i === bi ? 'dot best' : 'dot'}"/>`).join('')}
     <text x="${x(0)}" y="${H - 5}" class="ax">${dt(list[0])}</text><text x="${x(list.length - 1)}" y="${H - 5}" class="ax e">${dt(list.at(-1))}</text></svg>`;
 }
+// Entwicklung · 30 Tage: nur Einheiten mit gleicher Zeitvorgabe (Dauer-Auswahl), je Tag die beste Einheit (bei „Alle“ Summe des Tages)
+const ddmm = t => { const d = new Date(t); return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`; };
+function devData(exSel) {
+  return E.devSeries(st.history, st.maxes, { exercise: exSel, limitMin: st.devLim ?? null, now: now(), days: 30, info: id => workoutById(id) });
+}
+function devChart(sr, exSel, anim) {
+  if (!sr.points.length) return `<p class="muted devempty">Noch keine Einheiten in den letzten 30 Tagen</p>`;
+  const W = 340, H = 190, pl = 30, pr = sr.tests.length ? 28 : 10, pt = 12, pb = 24, DAY = 86400000;
+  const vals = sr.points.map(p => p.value).concat(sr.trend.map(p => p.value));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = Math.max(2, (hi - lo) * 0.12); lo = Math.max(0, lo - pad); hi += pad;
+  const yt = E.niceTicks(lo, hi, 4); lo = yt[0]; hi = yt.at(-1);
+  const x0 = sr.start + DAY / 2, x1 = sr.end - DAY / 2;
+  const x = t => pl + ((t + DAY / 2 - x0) / (x1 - x0)) * (W - pl - pr), y = v => pt + (1 - (v - lo) / (hi - lo || 1)) * (H - pt - pb);
+  let tt = [], ty = null;
+  if (sr.tests.length) { const tv = sr.tests.map(t => t.value); tt = E.niceTicks(Math.max(0, Math.min(...tv) - 2), Math.max(...tv) + 2, 3); ty = v => pt + (1 - (v - tt[0]) / (tt.at(-1) - tt[0] || 1)) * (H - pt - pb); }
+  const xt = [0, 7, 14, 21, 29].map(i => sr.start + i * DAY);
+  const xy = sr.points.map(p => [x(p.day), y(p.value)]);
+  const len = Math.ceil(xy.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - xy[i][0], q[1] - xy[i][1]), 0)) + 1;
+  const path = xy.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`).join('');
+  const trend = sr.trend.length >= 2 ? `<path class="tr" d="${sr.trend.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.value).toFixed(1)}`).join('')}"/>` : '';
+  return `<svg class="devc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Wiederholungen pro Einheit, letzte 30 Tage">
+    ${yt.map(v => `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${pl - 5}" y="${y(v) + 3.5}" text-anchor="end">${v}</text>`).join('')}
+    ${ty ? tt.map(v => `<text class="ax r" x="${W - pr + 5}" y="${ty(v) + 3.5}">${v}</text>`).join('') : ''}
+    ${xt.map((t, i) => `<text class="ax" x="${x(t)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}">${ddmm(t)}</text>`).join('')}
+    ${trend}
+    ${sr.points.length > 1 ? `<path class="wl ${anim ? 'draw' : ''}" style="--len:${len}" d="${path}"/>` : ''}
+    ${ty ? sr.tests.map(t => `<rect class="tm" x="${x(t.day) - 4.5}" y="${ty(t.value) - 4.5}" width="9" height="9" rx="1.5" transform="rotate(45 ${x(t.day)} ${ty(t.value)})"><title>Fitnesstest ${ddmm(t.t)}: ${t.value}</title></rect>`).join('') : ''}
+    ${xy.map((q, i) => `<circle class="wp ${st.devPt === i ? 'on' : ''}" data-ptc="${i}" cx="${q[0]}" cy="${q[1]}" r="4.5"/>`).join('')}
+    ${xy.map((q, i) => `<circle class="hit" data-pt="${i}" cx="${q[0]}" cy="${q[1]}" r="14"><title>${ddmm(sr.points[i].day)}: ${sr.points[i].value}</title></circle>`).join('')}
+  </svg>`;
+}
+function devInfo(sr, i) {
+  const p = sr.points[i]; if (!p) return '';
+  const names = [...new Set(p.sessions.map(x => x.name))].map(esc).join(', ');
+  const more = p.sessions.length > 1 ? (st.devEx === null ? ` · Summe aus ${p.sessions.length} Einheiten` : ` · beste von ${p.sessions.length} Einheiten`) : '';
+  return `<b>${new Date(p.day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}</b> · <b>${p.value}</b> Wdh. · ${names}${more}`;
+}
+function devPanel(defEx) {
+  const exList = [...new Set([...E.EXERCISES, ...st.history.map(h => h.exercise).filter(Boolean)])];
+  const exSel = st.devEx === undefined ? defEx : st.devEx;
+  const sr = devData(exSel), anim = st.devAnim && !reducedMotion(); st.devAnim = false;
+  st.devSr = sr; if (st.devPt != null && !sr.points[st.devPt]) st.devPt = null;
+  const sm = sr.summary, pct = sm ? sm.pct : null;
+  const sum = !sr.points.length ? '' : sm
+    ? `<p class="devsum ${pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'}">${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)} % Wdh. ggü. erster Woche <span class="muted">(Ø ${Math.round(sm.first)} → ${Math.round(sm.last)}${exSel == null ? ' pro Tag' : ''})</span></p>`
+    : `<p class="devsum flat">Wochenvergleich ab zwei Wochen mit Einheiten</p>`;
+  return `<div class="panel dev"><div class="panel-h"><span>Entwicklung · 30 Tage</span>${sr.limitMin ? `<span>${sr.limitMin}-min-Einheiten</span>` : ''}</div>
+    <div class="chips scrollx devex"><button class="chip ${exSel == null ? 'on' : ''}" data-dex="__all">Alle</button>${exList.map(ex => `<button class="chip ${ex === exSel ? 'on' : ''}" data-dex="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
+    ${sr.limits.length > 1 ? `<div class="chips devlim">${sr.limits.slice().sort((a, b) => a - b).map(l => `<button class="chip ${l === sr.limitMin ? 'on' : ''}" data-dlim="${l}">${l} min</button>`).join('')}</div>` : ''}
+    ${devChart(sr, exSel, anim)}
+    ${sr.points.length ? `<div class="legend"><span><i class="wll"></i>${exSel == null ? 'Wdh. pro Tag (Summe)' : 'Wdh. pro Einheit'}</span>${sr.trend.length >= 2 ? '<span><i class="trl"></i>Trend (Ø 3)</span>' : ''}${sr.tests.length ? '<span><i class="tml"></i>Fitnesstest (rechte Achse)</span>' : ''}</div>
+    <div class="devinfo ${st.devPt == null ? 'hint' : ''}" id="devinfo">${st.devPt == null ? 'Punkt antippen: Datum, Wiederholungen, Workout' : devInfo(sr, st.devPt)}</div>` : ''}
+    ${sum}</div>`;
+}
+function selectDevPoint(i) {
+  st.devPt = i; const inf = $('#devinfo'); if (!inf || !st.devSr) return;
+  inf.classList.remove('hint'); inf.innerHTML = devInfo(st.devSr, i);
+  app.querySelectorAll('.devc .wp').forEach(c => c.classList.toggle('on', +c.dataset.ptc === i));
+}
 function viewHistory() {
   const ids = [...new Set(st.history.map(h => h.workoutId))];
   if (st.histFilter && !ids.includes(st.histFilter)) st.histFilter = null;
@@ -837,8 +952,9 @@ function viewHistory() {
   <main class="scroll">
     ${maxPanel()}
     ${st.history.length ? `<div class="chips scrollx">${ids.map(id => `<button class="chip ${id === f ? 'on' : ''}" data-hf="${id}">${esc(nameOf(id))}</button>`).join('')}</div>
+    ${devPanel((st.history.find(h => h.workoutId === f) || {}).exercise ?? workoutById(f)?.exercise ?? null)}
     <div class="panel"><div class="panel-h"><span>Fortschritt</span>${best ? `<span>Bestwert <b class="acc">${best.total}</b></span>` : ''}</div>${lineChart(sel)}</div>
-    <div class="hlist">${items}</div>` : `<div class="empty"><p>Noch keine Einheiten.</p><button class="btn primary" data-go="home">Workout wählen</button></div>`}
+    <div class="hlist">${items}</div>` : `<div class="empty"><p>Noch keine Einheiten.</p><button class="btn primary" data-go="home">Workout wählen</button></div>${devPanel(null)}`}
   </main>${tabs('history')}`;
 }
 
@@ -879,6 +995,8 @@ function render() {
   const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0;
   app.innerHTML = v(); app.dataset.view = st.view;
   animateFigures(app);
+  // vorausgewählten Chip in den sichtbaren Bereich der horizontalen Leiste holen
+  app.querySelectorAll('.chips.scrollx').forEach(c => { const on = c.querySelector('.chip.on'); if (on && c.scrollWidth > c.clientWidth) c.scrollLeft = Math.max(0, on.offsetLeft - c.offsetLeft - (c.clientWidth - on.offsetWidth) / 2); });
   if (keep && st.view === st._lastView && $('.scroll')) $('.scroll').scrollTop = keep;
   st._lastView = st.view;
 }
@@ -899,9 +1017,10 @@ function saveDraft() {
 }
 
 app.addEventListener('click', e => {
+  const pt = e.target.closest('[data-pt]'); if (pt) return selectDevPoint(+pt.dataset.pt);
   const b = e.target.closest('button,[data-hist]'); if (!b) return;
   const d = b.dataset, s = st.session;
-  if (d.go) return go(d.go);
+  if (d.go) { if (d.go === 'history') { st.devAnim = true; st.devPt = null; } return go(d.go); }
   if (d.step) {
     const [lo, hi, step] = LIM[d.lim]; const cur = getPath(st.draft, d.step);
     setPath(st.draft, d.step, Math.min(hi, Math.max(lo, cur + step * +d.d)));
@@ -911,12 +1030,13 @@ app.addEventListener('click', e => {
   if (d.seg) { setPath(st.draft, d.seg, d.seg === 'auto.phases' ? +d.v : d.v); if (d.seg.startsWith('auto.')) reauto(); const n = $('#f-name'); if (n) st.draft.name = n.value; return render(); }
   if (d.ex) { const n = $('#f-name'); if (n) st.draft.name = n.value; st.draft.exercise = d.ex === '__custom' ? (E.EXERCISES.includes(st.draft.exercise) ? '' : st.draft.exercise) : d.ex; reauto(); render(); if (d.ex === '__custom') $('#f-ex')?.focus(); return; }
   if (d.exsel) {
-    st.settings.exSel = d.exsel; store.saveSettings(st.settings);
-    if (d.exsel !== '__own' && !maxOf(d.exsel) && !st.settings.asked.includes(d.exsel)) return openAssess(d.exsel);
-    return render();
+    if (d.exsel !== '__own' && openKey() !== d.exsel && !maxOf(d.exsel) && !st.settings.asked.includes(d.exsel)) { st.openEx = d.exsel; st.settings.exSel = d.exsel; store.saveSettings(st.settings); return openAssess(d.exsel); }
+    return toggleEx(d.exsel);
   }
   if (d.hist) { st.result = st.history.find(h => h.id === d.hist); st.resultFrom = 'history'; return go('result'); }
-  if (d.hf) { st.histFilter = d.hf; return render(); }
+  if (d.hf) { st.histFilter = d.hf; st.devEx = undefined; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
+  if (d.dex) { st.devEx = d.dex === '__all' ? null : d.dex; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
+  if (d.dlim) { st.devLim = +d.dlim; st.devPt = null; st.devAnim = true; return render(); }
   if (d.lead) { st.settings.leadIn = +d.lead; store.saveSettings(st.settings); return render(); }
   if (d.pv != null) { st.partialVal = +d.pv; return render(); }
   if (d.pst) { planStep(d.pst, +d.i, +d.d); return render(); }
@@ -953,7 +1073,7 @@ app.addEventListener('click', e => {
       if (st.plan) { const w0 = workoutById(st.plan.workoutId); st.plan.phases = structuredClone(w0.phases); st.plan.base = structuredClone(w0.phases); } return render();
     case 'tune-apply': return applyTune();
     case 'assess': return openAssess(d.aex, d.then || st.view);
-    case 'fitness': return openAssess(null, 'more');
+    case 'fitness': return openAssess(null, d.then || 'more');
     case 'applyauto': st.draft.auto.enabled = true; reauto(); return render();
     case 'av': st.assess.val = Math.max(1, Math.min(999, (+st.assess.val || 0) + +d.d)); { const el = $('#a-num'); if (el) el.value = st.assess.val; } return updateAssessInput();
     case 'assess-save': return saveAssess();
