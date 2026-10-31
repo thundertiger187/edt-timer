@@ -88,6 +88,7 @@ export function normalizeWorkout(w) {
     countMode: w.countMode === 'tap' ? 'tap' : 'set',
     auto: { enabled: !!w.auto?.enabled, pct: clamp(int(w.auto?.pct, 40), 20, 80), phases: w.auto?.phases === 2 ? 2 : 3,
       variant: (w.auto?.variant ?? 'reps') === 'rest' ? 'rest' : 'reps' },
+    muscle: MUSCLE_GROUPS[w.muscle] ? w.muscle : 'own',
     template: !!w.template,
   };
 }
@@ -350,8 +351,8 @@ export function phaseStartRounds(phases) {
  *      Phase 2 nicht erreicht oder nur eine Phase: Pause Phase 1 um 5 s kürzer (mind. 5 s).
  *  - Sonst (einzelne „knapp“): Plan beibehalten.
  */
-export function suggestTune({ sets, phases, aborted }) {
-  if (aborted || !Array.isArray(phases) || !phases.length) return null;
+export function suggestTune({ sets, phases, aborted, shortRec }) {
+  if (aborted || shortRec || !Array.isArray(phases) || !phases.length) return null;
   const P = phases.map(p => ({ ...p }));
   const full = sets.filter(x => !x.partial);
   if (full.length < 3) return null;
@@ -401,6 +402,59 @@ export function scaleTune(tune, max) {
   return { ...tune, max, phases: tune.phases.map(p => ({ ...p, reps: Math.max(1, Math.round(p.reps * max / tune.max)) })) };
 }
 
+// ---------- Erholung nach Fitnesstest / EDT (je Muskelgruppe) ----------
+/** Muskeln je Gruppe. Erholung gilt, wenn sich die Muskeln zweier Übungen überschneiden. */
+export const MUSCLE_GROUPS = {
+  push: { name: 'Brust/Trizeps/Schulter', muscles: ['Brust', 'Trizeps', 'Schulter'] },
+  legs: { name: 'Beine', muscles: ['Beine'] },
+  pull: { name: 'Rücken/Bizeps', muscles: ['Rücken', 'Bizeps'] },
+  own: { name: 'eigene', muscles: [] }, // eigene Übung: überschneidet sich nur mit sich selbst
+};
+export const EXERCISE_MUSCLES = {
+  'Liegestütze': { group: 'push', muscles: ['Brust', 'Trizeps', 'Schulter'] },
+  'Dips': { group: 'push', muscles: ['Brust', 'Trizeps', 'Schulter'] },
+  'Kniebeugen': { group: 'legs', muscles: ['Beine'] },
+  'Klimmzüge': { group: 'pull', muscles: ['Rücken', 'Bizeps'] },
+};
+/** { group, name, muscles } einer Übung; eigene Übungen über die im Editor gewählte Gruppe. */
+export function musclesOf(exercise, muscle) {
+  const k = EXERCISE_MUSCLES[exercise];
+  if (k) return { group: k.group, name: MUSCLE_GROUPS[k.group].name, muscles: k.muscles };
+  const g = MUSCLE_GROUPS[muscle] && muscle !== 'own' ? muscle : 'own';
+  return { group: g, name: g === 'own' ? String(exercise || 'eigene Übung') : MUSCLE_GROUPS[g].name,
+    muscles: g === 'own' ? ['eigen:' + String(exercise || '').toLowerCase()] : MUSCLE_GROUPS[g].muscles };
+}
+export const overlaps = (a, b) => a.muscles.some(m => b.muscles.includes(m));
+/** Standard-Erholung in Minuten (in den Einstellungen änderbar). */
+export const RECOVERY_DEFAULTS = { afterTest: 10, betweenEdt: 10, betweenTests: 10 };
+const recMin = (rec, evType, kind) => {
+  const r = { ...RECOVERY_DEFAULTS, ...(rec || {}) };
+  if (kind === 'test') return evType === 'test' ? r.betweenTests : r.betweenEdt;
+  return evType === 'test' ? r.afterTest : r.betweenEdt;
+};
+/**
+ * Restliche Erholung für eine geplante Einheit.
+ * events: [{ type: 'test'|'edt', exercise, muscle?, at (ms, Ende der Belastung) }]
+ * target: { exercise, muscle?, kind: 'edt'|'test' }
+ * → { leftMs, needMs, until, cause } (leftMs 0 = erholt; cause = Ereignis mit dem spätesten Ende)
+ */
+export function recoveryLeft(events, target, rec, now) {
+  const tm = musclesOf(target.exercise, target.muscle);
+  let best = { leftMs: 0, needMs: 0, until: 0, cause: null, group: tm.name };
+  for (const ev of events || []) {
+    if (!ev || !Number.isFinite(ev.at) || !overlaps(tm, musclesOf(ev.exercise, ev.muscle))) continue;
+    const needMs = Math.max(0, recMin(rec, ev.type, target.kind || 'edt')) * 60000, until = ev.at + needMs;
+    if (until > now && until > best.until) best = { leftMs: until - now, needMs, until, cause: ev, group: tm.name };
+  }
+  return best;
+}
+/** Reduktion bei verkürzter Erholung: linear von 0 % (erholt) bis maxCut (0 min Erholung). */
+export function shortRestFactor(leftMs, needMs, maxCut = 0.2) {
+  if (!(needMs > 0) || !(leftMs > 0)) return 1;
+  return 1 - maxCut * Math.min(1, leftMs / needMs);
+}
+export const reducePhases = (phases, f) => phases.map(p => ({ ...p, reps: Math.max(1, Math.round(p.reps * f)) }));
+
 // Vorlagen: Phasen = Plan aus einem typischen Mittel-Maximum (werden nach dem Fitnesstest neu berechnet).
 const tpl = (id, name, exercise, limitMin, max, auto, adapt) =>
   ({ id, template: true, name, exercise, limitMin, phases: planFromMax(exercise, max, { ...auto, limitMin }).phases, adapt, auto: { enabled: true, ...auto } });
@@ -411,3 +465,4 @@ export const TEMPLATES = [
   tpl('tpl-dips-6', 'Dips-EDT 6 min', 'Dips', 6, 12, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'reps', reps: 1, minReps: 2 }),
   tpl('tpl-klimmzug-8', 'Klimmzug-EDT 8 min', 'Klimmzüge', 8, 8, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'both', reps: 1, rest: 10, minReps: 1 }),
 ].map(normalizeWorkout);
+

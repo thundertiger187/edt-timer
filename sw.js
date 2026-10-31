@@ -1,5 +1,5 @@
 // Offline-Cache. Version wird beim Build gesetzt.
-const CACHE = 'edt-timer-1.2.0-d1b55e7a';
+const CACHE = 'edt-timer-1.3.0-216fd5dd';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'engine.js', 'audio.js', 'store.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
