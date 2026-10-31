@@ -1,4 +1,4 @@
-2026-10-31T11:52:49.639Z http://127.0.0.1:18738/
+2026-10-31T21:59:38.192Z http://127.0.0.1:18738/
 ✓ Heute: Header „Training“ + Datum, Karte „Als Nächstes · 19:00“ Klimmzüge, ein Start-Button, Zeilen erledigt/verpasst, Wochenpunkte – done:08:00Liegestütze ✓ erledigt | late:12:00Kniebeugen verpasst · Start ›
 ✓ Übungen: 2×2 Kacheln gleich hoch, Figur in eigener Box, „Max am Stück“/„Rekord 5 min“, Zeile „Eigene Übungen“ – Liegestütze: Max am Stück 28 · Rekord 5 min 117 | Kniebeugen: Max am Stück 35 · Rekord 5 min – | Dips: Max am Stück Test offen · Rekord 5 min – | Klimmzüge: Max am Stück 10 · Rekord 5 min –
 ✓ Zuletzt: zwei letzte Einheiten – Liegestütz-EDT 5 minSa., 31.10. · 23 Sätze · 23/min115 | Liegestütz-EDT 5 minFr., 30.10. · 23 Sätze · 23,4/min117BEST

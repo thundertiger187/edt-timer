@@ -3,6 +3,7 @@ import * as A from './audio.js';
 import { store, migrated } from './store.js';
 import { figureSvg, animateFigures } from './figures.js';
 import * as W from './week.js';
+import * as FX from './fx.js';
 
 const VERSION = '__VERSION__';
 const $ = (s, r = document) => r.querySelector(s);
@@ -787,11 +788,14 @@ function viewResult() {
   const best = bestOf(r.workoutId);
   const pr = !r.aborted && r.total > 0 && (r.prevBest == null || r.total > r.prevBest);
   const full = r.sets.filter(x => x.done >= x.target).length;
-  const d = new Date(r.date);
+  const d = new Date(r.date), info = id => workoutById(id);
+  // „Neuer Rekord“: beste abgeschlossene 5-min-Einheit der Übung, verglichen mit allen früheren
+  const prev5 = E.bestForLimit(st.history.filter(h => h.id !== r.id && Date.parse(h.date) < Date.parse(r.date)), r.exercise, REC_MIN, info);
+  const rec5 = !r.aborted && r.total > 0 && E.sessionLimitMin(r, info) === REC_MIN && (!prev5 || r.total > prev5.total);
   return `<header class="top"><button class="icon" data-go="${isNew ? 'home' : 'history'}" aria-label="Zurück">‹</button><h2>Ergebnis</h2><span></span></header>
   <main class="scroll">
-    <section class="hero ${pr ? 'pr' : ''}">
-      ${pr ? '<div class="badge big">Neuer Bestwert</div>' : ''}
+    <section class="hero ${pr || rec5 ? 'pr' : ''}">
+      ${rec5 ? `<div class="badge big rec">Neuer Rekord<small> · ${REC_MIN} min${prev5 ? ` · vorher ${prev5.total}` : ''}</small></div>` : pr ? '<div class="badge big">Neuer Bestwert</div>' : ''}
       <div class="huge">${r.total}</div><div class="lbl">Wiederholungen · ${esc(r.exercise)}</div>
       <div class="sub">${esc(r.workoutName)} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}${r.aborted ? ' · abgebrochen' : ''}</div>
       ${!pr && best ? `<div class="sub">Bestwert ${best.total}${best.id !== r.id ? ` (${r.total - best.total >= 0 ? '+' : ''}${r.total - best.total})` : ''}</div>` : ''}
@@ -993,15 +997,32 @@ function viewMore() {
 function render() {
   const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess, plan: viewPlan, week: viewWeek }[st.view];
   const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0;
+  FX.stopScrambles();
   app.innerHTML = v(); app.dataset.view = st.view;
   animateFigures(app);
+  applyFx();
   // vorausgewählten Chip in den sichtbaren Bereich der horizontalen Leiste holen
   app.querySelectorAll('.chips.scrollx').forEach(c => { const on = c.querySelector('.chip.on'); if (on && c.scrollWidth > c.clientWidth) c.scrollLeft = Math.max(0, on.offsetLeft - c.offsetLeft - (c.clientWidth - on.offsetWidth) / 2); });
   if (keep && st.view === st._lastView && $('.scroll')) $('.scroll').scrollTop = keep;
   st._lastView = st.view;
 }
+// v1.6 Effekte: Hintergrund je Ansicht/Phase, Karten-Einblendung einmal pro Ansichtswechsel, Ziffern-Effekt beim Öffnen des Ergebnisses
+const REVEAL_SEL = { home: '.sec, .extile, .lr', week: '.scroll > *', history: '.scroll > .panel, .chips, .hitem' };
+function applyFx() {
+  const s = st.session, mode = st.view === 'home' ? 'home' : st.view === 'train' && s && !st.lead ? (s.status === 'rest' ? 'rest' : 'work') : 'off';
+  FX.background(mode);
+  if (st.fxReveal && REVEAL_SEL[st.view]) FX.reveal(app, REVEAL_SEL[st.view]);
+  st.fxReveal = false;
+  if (st.view === 'result' && st.fxScramble) {
+    st.fxScramble = false;
+    const big = $('.hero .huge'), hero = $('.hero');
+    FX.scramble(big, { dur: 1100, onDone: () => { if (hero?.classList.contains('pr') && !FX.reduced()) hero.classList.add('flash'); } });
+    app.querySelectorAll('.grid3 b').forEach((b, i) => FX.scramble(b, { dur: 800 + i * 100 }));
+  }
+}
 function go(view) {
-  if (view === 'result' && st.view !== 'result') st.tuneSel = 0;
+  if (view === 'result' && st.view !== 'result') { st.tuneSel = 0; st.fxScramble = true; }
+  if (view !== st.view) st.fxReveal = true;
   st.view = view; st.layoutKey = ''; render();
   if (view === 'train' || view === 'assess') { loop(); frame(); } else window.scrollTo(0, 0);
   if (view !== 'train' && $('.scroll')) $('.scroll').scrollTop = 0;
@@ -1168,6 +1189,7 @@ if ((st.settings.planVer || 0) < 2) {
   store.saveWorkouts(st.workouts); st.settings.planVer = 2; store.saveSettings(st.settings);
 }
 if (migrated.length) setTimeout(() => toast('Daten aus RepZeit übernommen'), 400);
+FX.initGlow(); st.fxReveal = true;
 const needSetup = () => !st.settings.setupDone && !Object.values(st.maxes).some(l => l && l.length);
 
 // Laufendes Training nach Neuladen fortsetzen

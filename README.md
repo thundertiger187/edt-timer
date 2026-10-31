@@ -61,6 +61,17 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Bewegung und Effekte (v1.6.0)
+
+Alles in reinem CSS/JS (`src/fx.js`), nur `transform`/`opacity`, gesteuert über `requestAnimationFrame` bzw. CSS-Animationen. Bei „Bewegung reduzieren“ im System ist alles aus oder statisch.
+
+- **Leuchtpunkt beim Tippen:** Ein runder Schein erscheint an der Tippposition auf Kacheln, Karten und Buttons und verblasst in rund 0,5 s. Er ist auf Karten cyan, auf Start-Buttons grün. Er liegt in einer eigenen Ebene ohne Zeigerereignisse (`.fx-layer`, `pointer-events:none`), Tippen und Scrollen bleiben unverändert.
+- **Ziffern-Effekt im Ergebnis:** Gesamtwiederholungen, Sätze, Wdh./Minute und Dauer zeigen beim Öffnen rund 1 s Zufallsziffern und rasten dann von links nach rechts auf den echten Wert ein. Der echte Wert steht die ganze Zeit im Text, die Zufallsziffern sind nur ein Pseudo-Inhalt ohne Alternativtext. Screenreader und Kopieren liefern deshalb sofort den richtigen Wert.
+- **„Neuer Rekord“:** Ist eine 5-min-Einheit besser als alle früheren 5-min-Einheiten der Übung, steht „Neuer Rekord · 5 min · vorher X“ über der Zahl. Ein anderer neuer Bestwert im Workout zeigt weiter „Neuer Bestwert“. Nach dem Einrasten leuchtet die Zahl kurz auf.
+- **Einblenden beim Scrollen:** Abschnitte und Karten auf Start, Woche und Verlauf gleiten beim Öffnen der Ansicht mit 14 px Versatz und Überblendung, 40–50 ms gestaffelt, ein (IntersectionObserver, einmal pro Ansichtswechsel). Der sichtbare Bereich ist nach höchstens rund 300 ms vollständig da. Versteckt wird nur über die Klasse `.rv`, die das Skript setzt. Ohne JS oder ohne IntersectionObserver bleibt alles sichtbar.
+- **Fließender Hintergrund:** Hinter dem Kopf der Startseite und hinter dem laufenden Timer bewegen sich sehr dunkle Farbflächen in 24–37 s langen Schleifen. Sie sind im Satz grünlich und in der Pause cyan, mit 1,2 s Überblendung beim Phasenwechsel. Ist die Seite verborgen, wird pausiert. Die Timer-Uhr bleibt davon unberührt.
+- **Tests:** `tests/e2e-fx.mjs` prüft u. a. das Glow-Element bei `pointerdown`, das exakte Endergebnis und den aria-Wert des Ziffern-Effekts, das Abschalten bei reduzierter Bewegung und die Sichtbarkeit ohne IntersectionObserver. Mit `--video` entsteht zusätzlich `screens/1.6.0_demo.mp4`.
+
 ## Startseite „Training“ und Entwicklung im Verlauf (v1.5.0)
 - Startseite mit drei Bereichen: **Heute** (Karte für die nächste Einheit mit einem Start-Button, weitere Einheiten des Tages als Zeilen, Woche als Punkte; ohne Wochenplan das zuletzt trainierte Workout und „Wochenplan anlegen“), **Übungen** (2×2 Kacheln + „Eigene Übungen“; Tippen klappt darunter ein Panel mit Fitnesstest, Workouts und „+ Neues Workout“ auf, erneutes Tippen klappt zu, nur eines offen) und **Zuletzt** (zwei letzte Einheiten).
 - Kacheln: „Max am Stück“ (Fitnesstest) und „Rekord 5 min“ (beste abgeschlossene 5-min-Einheit, auch mit verkürzter Erholung; „–“ wenn keine). „Erholung noch m:ss“ nur solange nötig.
