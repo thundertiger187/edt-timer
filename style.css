@@ -1,4 +1,4 @@
-:root{--bg:#0b0d10;--bg2:#12151a;--card:#161a20;--line:#252b33;--tx:#f2f5f7;--mut:#8a94a1;--acc:#c6ff3d;--acc2:#38d9ff;--bad:#ff5d5d;--warn:#ffb03b;
+:root{--bg:#0b0d10;--bg2:#12151a;--card:#161a20;--line:#252b33;--tx:#f2f5f7;--mut:#939daa;--acc:#c6ff3d;--acc2:#38d9ff;--bad:#ff5d5d;--warn:#ffb03b;
   --r:20px;--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,Inter,system-ui,sans-serif}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -169,7 +169,9 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .toast{position:fixed;left:50%;bottom:calc(var(--sab) + 90px);transform:translate(-50%,20px);background:#222831;border:1px solid var(--line);padding:12px 18px;border-radius:14px;font-weight:600;opacity:0;transition:.25s;z-index:20;max-width:90vw}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (max-height:700px){.bigclock{font-size:72px}.stat .num{font-size:32px}.hit{flex-basis:34%}.round{width:64px;height:64px}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* v1.6.1 Bewegung: html[data-motion] = full | gentle | off (Einstellung „Animationen“); ohne JS folgt CSS dem System */
+html[data-motion=off] *,html[data-motion=off] *::before,html[data-motion=off] *::after{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){html:not([data-motion]) *{animation:none!important;transition:none!important}}
 /* Übungsauswahl & Einstufung */
 .extiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .extile{min-height:96px;border-radius:22px;background:var(--card);border:1.5px solid var(--line);display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;padding:14px 16px;text-align:left;transition:transform .08s,border-color .2s,background .2s}
@@ -474,7 +476,7 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .devinfo b{color:var(--tx)}.devinfo.hint{color:var(--mut)}
 .devsum{margin:8px 2px 0;font-size:14px;font-weight:700}.devsum.up{color:var(--acc)}.devsum.down{color:var(--warn)}.devsum.flat{color:var(--mut)}
 .legend .tml{background:var(--acc2);border-radius:50%}.legend .trl{height:0;border-top:2px dashed #9aa3ae;border-radius:0}.legend .wll{background:var(--acc)}
-@media (prefers-reduced-motion:reduce){.devc .wl.draw{stroke-dasharray:none;stroke-dashoffset:0}}
+html:not([data-motion=full]) .devc .wl.draw{stroke-dasharray:none;stroke-dashoffset:0;animation:none}
 .lastadj{display:flex;align-items:center;gap:12px}
 .xp-body .card{padding:14px}
 .xp-body .card-foot{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;align-items:end}
@@ -491,10 +493,10 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .fx-layer{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
 .fx-glow{position:fixed;overflow:hidden;pointer-events:none;contain:strict}
 .fx-glow::after{content:"";position:absolute;left:calc(var(--gx) - var(--gs));top:calc(var(--gy) - var(--gs));width:calc(var(--gs) * 2);height:calc(var(--gs) * 2);border-radius:50%;
-  background:radial-gradient(circle,var(--gc) 0,transparent 62%);opacity:0;transform:scale(.35);animation:fxglow .52s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
-.fx-glow.cyan{--gc:rgba(56,217,255,.30)}
-.fx-glow.green{--gc:rgba(198,255,61,.34)}
-.fx-glow.green.filled{--gc:rgba(255,255,255,.55)}
+  background:radial-gradient(circle,var(--gc) 0,var(--gc) 8%,transparent 66%);opacity:0;transform:scale(.35);animation:fxglow .6s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
+.fx-glow.cyan{--gc:rgba(56,217,255,.46)}
+.fx-glow.green{--gc:rgba(198,255,61,.50)}
+.fx-glow.green.filled{--gc:rgba(255,255,255,.72)}
 @keyframes fxglow{0%{opacity:0;transform:scale(.35)}18%{opacity:1}100%{opacity:0;transform:scale(1)}}
 /* 2. Ziffern-Effekt: echter Wert bleibt Text, Zufallsziffern als Pseudo-Inhalt mit leerem Alternativtext */
 .huge,.grid3 b{position:relative}
@@ -509,7 +511,7 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .hero > *{position:relative}
 .badge.rec small{font-weight:600;opacity:.8}
 /* 3. Karten beim Scrollen (nur wenn JS .rv setzt) */
-.rv{opacity:0;transform:translateY(14px);animation:none!important}
+.rv{opacity:0;transform:translateY(20px);animation:none!important}
 .rv.rv-in{opacity:1;transform:none;transition:opacity .22s ease-out var(--rvd,0ms),transform .28s cubic-bezier(.2,.8,.3,1) var(--rvd,0ms)}
 /* 4. Fließender Hintergrund */
 #fxbg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity .8s ease}
@@ -519,8 +521,8 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .fxl.c{opacity:0}
 #fxbg[data-mode=rest] .fxl.g{opacity:0}#fxbg[data-mode=rest] .fxl.c{opacity:1}
 .fxl i{position:absolute;width:90vmax;height:90vmax;border-radius:50%;will-change:transform;animation:fxa 30s ease-in-out infinite alternate}
-.fxl.g i{background:radial-gradient(circle,rgba(198,255,61,.085) 0,rgba(198,255,61,.03) 35%,transparent 62%)}
-.fxl.c i{background:radial-gradient(circle,rgba(56,217,255,.10) 0,rgba(56,217,255,.035) 35%,transparent 62%)}
+.fxl.g i{background:radial-gradient(circle,rgba(198,255,61,.11) 0,rgba(198,255,61,.06) 40%,transparent 68%)}
+.fxl.c i{background:radial-gradient(circle,rgba(56,217,255,.13) 0,rgba(56,217,255,.065) 40%,transparent 68%)}
 .fxl i:nth-child(1){left:-45vmax;top:-50vmax}
 .fxl i:nth-child(2){left:10vmax;top:-40vmax;animation-name:fxb;animation-duration:37s}
 .fxl i:nth-child(3){left:-25vmax;top:-20vmax;animation-name:fxc;animation-duration:24s;opacity:.7}
@@ -530,5 +532,66 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 @keyframes fxb{0%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-20vmax,14vmax) scale(.92)}100%{transform:translate(-8vmax,4vmax) scale(1.2)}}
 @keyframes fxc{0%{transform:translate(0,0) scale(.9)}100%{transform:translate(24vmax,-10vmax) scale(1.1)}}
 #fxbg.paused .fxl i{animation-play-state:paused}
-.train{background-color:transparent}
-@media (prefers-reduced-motion:reduce){.fx-glow{display:none}.rv{opacity:1!important;transform:none!important}.scr{color:inherit!important}.scr::after{content:none}.hero.flash::before{animation:none}}
+.train,.train.st-work,.train.st-partial,.train.st-rest{background:transparent} /* v1.6.1: Tönung kommt aus #fxbg */
+/* Stufe „gentle“: nur Überblendungen, keine Bewegung */
+@keyframes fxo{from{opacity:0}}
+@keyframes fxglowfade{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+@keyframes fxflashfade{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@keyframes fxbreath{0%{opacity:.55}100%{opacity:1}}
+html[data-motion=gentle] .card,html[data-motion=gentle] .phase,html[data-motion=gentle] .st-work .work,html[data-motion=gentle] .st-rest .rest,html[data-motion=gentle] .badge.big,html[data-motion=gentle] .sheet{animation-name:fxo!important}
+html[data-motion=gentle] .leadnum{animation:none}
+html[data-motion=gentle] .fx-glow::after{animation-name:fxglowfade;transform:none}
+html[data-motion=gentle] .hero.flash::before{animation-name:fxflashfade;transform:none}
+html[data-motion=gentle] .rv{transform:none}
+html[data-motion=gentle] .fxl i{animation-name:fxbreath!important;transform:none}
+html[data-motion=gentle] .hit:active{transform:none}
+/* Stufe „off“ bzw. ohne JS bei reduzierter Bewegung */
+html[data-motion=off] .fx-glow{display:none}html[data-motion=off] .rv{opacity:1!important;transform:none!important}html[data-motion=off] .scr{color:inherit!important}html[data-motion=off] .scr::after{content:none}
+@media (prefers-reduced-motion:reduce){html:not([data-motion]) .rv{opacity:1;transform:none}}
+
+/* ===== v1.6.1 Timer-Layout: Ring nimmt nur den freien Platz, nichts liegt übereinander ===== */
+.train > *{flex-shrink:0}
+.train > .rest,.train > .work,.train > .leadbox,.train > .testclock{flex:1 1 0;min-height:0}
+.rest{gap:8px;padding:4px 0;width:100%}
+.ringbox{flex:1 1 0;min-height:0;width:100%;container-type:size;display:flex;align-items:center;justify-content:center}
+.ringwrap,.st-rest .ringwrap{width:min(60vw,240px,100cqh,100cqw);height:auto;aspect-ratio:1;container-type:inline-size;flex:none}
+.restnum{font-size:clamp(18px,38cqw,92px)}
+.ring-in .lbl{font-size:clamp(10px,6.5cqw,13px)}
+.next{margin-top:0;flex:none;gap:6px}
+.st-rest .next{font-size:16px}
+.leadnum{font-size:min(55vw,240px,38dvh)}
+.testclock .bigclock{font-size:min(30vw,128px,26dvh)}
+.work{gap:4px}
+.reps{font-size:min(26vw,120px,15dvh)}
+.hit{flex:0 1 38%;min-height:96px}
+@media (max-height:700px){
+  .bigclock{font-size:60px}.bar{margin-top:6px}.pstrip{margin-top:4px}.ttop{padding-top:4px}
+  .stats2{padding:6px 14px 2px}.stats2 .smain .num{font-size:40px}.stats2 .sside .num{font-size:18px}
+  .train > .pos{padding:3px 6px;font-size:14px}
+  .restbar.compact .rc{padding:6px 10px;gap:4px;margin-bottom:6px}.restbar.compact .rate .seg button{min-height:34px}
+  .restbar.compact .round.sm{width:36px;height:36px}.restbar.compact .btn.wide{min-height:42px}
+  .round{width:60px;height:60px;font-size:32px}.hit svg{width:48px;height:48px}.hit{font-size:26px}
+}
+/* Querformat auf dem Handy: drei Spalten (Uhr/Statistik · Ring bzw. Zähler · Bedienung) */
+@media (orientation:landscape) and (max-height:520px){
+  #app[data-view=train],#app[data-view=assess]{max-width:none}
+  .train:not(:has(.leadbox)){display:grid;grid-template-columns:1.05fr 1fr 1fr;grid-template-rows:auto auto auto auto minmax(0,1fr);column-gap:14px;
+    padding-left:max(var(--sal,0px),10px);padding-right:max(var(--sar,0px),10px)}
+  .train:not(:has(.leadbox)) > .ttop{grid-column:1/-1;grid-row:1}
+  .train:not(:has(.leadbox)) > .clock{grid-column:1;grid-row:2;padding:0}
+  .train:not(:has(.leadbox)) > .stats2{grid-column:1;grid-row:3;padding:8px 0 2px}
+  .train:not(:has(.leadbox)) > .pos{grid-column:1;grid-row:4}
+  .train:not(:has(.leadbox)) > .rest,.train:not(:has(.leadbox)) > .work{grid-column:2;grid-row:2/-1;padding-bottom:calc(var(--sab) + 8px)}
+  .train:not(:has(.leadbox)) > .restbar{grid-column:3;grid-row:2/-1;align-self:center;padding:0 0 calc(var(--sab) + 8px)}
+  .train:not(:has(.leadbox)) > .hit{grid-column:3;grid-row:2/-1;margin:8px 0 calc(var(--sab) + 10px);min-height:0}
+  .train.assess:not(:has(.leadbox)) > .testclock{grid-column:1/3;grid-row:2/-1}
+  .bigclock{font-size:54px}.stats2 .smain .num{font-size:36px}
+  .reps{font-size:min(20dvh,96px)}
+}
+/* v1.6.1 Update-Hinweis + Einstellungen */
+.updbar{position:fixed;left:12px;right:12px;bottom:calc(var(--sab) + 84px);z-index:60;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:536px;margin:0 auto;
+  background:#1d2530;border:1px solid rgba(56,217,255,.5);border-radius:16px;padding:10px 12px 10px 16px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.updbar .btn{width:auto;margin:0;min-height:40px;padding:0 16px}
+.verrow b{font-variant-numeric:tabular-nums;font-size:14px;color:var(--tx)}
+.animpanel .seg button{font-size:13px}
+#fxbg[data-mode=home] .fxl i:nth-child(3){left:35vmax;top:-60vmax;opacity:.55}

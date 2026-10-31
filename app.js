@@ -1,11 +1,11 @@
-import * as E from './engine.js';
-import * as A from './audio.js';
-import { store, migrated } from './store.js';
-import { figureSvg, animateFigures } from './figures.js';
-import * as W from './week.js';
-import * as FX from './fx.js';
+import * as E from './engine.js?v=ca63cfe1';
+import * as A from './audio.js?v=ca63cfe1';
+import { store, migrated } from './store.js?v=ca63cfe1';
+import { figureSvg, animateFigures } from './figures.js?v=ca63cfe1';
+import * as W from './week.js?v=ca63cfe1';
+import * as FX from './fx.js?v=ca63cfe1';
 
-const VERSION = '1.6.0-d75d0461';
+const VERSION = '1.6.1-ca63cfe1';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -215,7 +215,7 @@ function viewHome() {
   </main>${tabs('home')}`;
 }
 // Auf-/Zuklappen der Übungs-Panels (eines offen); Animation nur ohne prefers-reduced-motion
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => FX.reduced(); // v1.6.1: Einstellung „Animationen“ + System
 function toggleEx(key) {
   const cur = openKey(), el = $('#xp-panel');
   const apply = () => { st.openEx = cur === key ? null : key; if (st.openEx && st.openEx !== '__own') { st.settings.exSel = key; store.saveSettings(st.settings); } else if (st.openEx === '__own') { st.settings.exSel = '__own'; store.saveSettings(st.settings); }
@@ -660,8 +660,8 @@ function viewTrain() {
          <button class="hit" data-act="done"><svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor"/></svg><span>Satz geschafft</span></button>`;
   } else if (s.status === 'rest') {
     const last = s.sets.at(-1);
-    body = `<section class="rest"><div class="ringwrap"><svg class="ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rbg"/><circle id="t-ring" cx="100" cy="100" r="88" class="rfg" pathLength="1000"/></svg>
-        <div class="ring-in"><div id="t-rest" class="restnum">${Math.ceil((s.restEndsAt - now()) / 1000)}</div><div class="lbl">Pause</div></div></div>
+    body = `<section class="rest"><div class="ringbox"><div class="ringwrap"><svg class="ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rbg"/><circle id="t-ring" cx="100" cy="100" r="88" class="rfg" pathLength="1000"/></svg>
+        <div class="ring-in"><div id="t-rest" class="restnum">${Math.ceil((s.restEndsAt - now()) / 1000)}</div><div class="lbl">Pause</div></div></div></div>
         <div class="next">Als Nächstes: <b>${s.target} Wdh.</b>${s.pendingPhase ? `<span class="badge">${phaseBadge(s)}</span>` : ''}</div></section>
       <div class="restbar compact"><div class="rc">${last && !last.partial ? `<div class="rate"><span>Satz ${last.n}</span><div class="seg">${[['ok', 'geschafft'], ['hard', 'knapp'], ['fail', 'nicht geschafft']].map(([v, l]) => `<button data-rate="${v}" class="r-${v} ${E.rateOf(last) === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>` : ''}
         <div class="last"><span>Letzter Satz</span><span class="lastadj"><button class="round sm" data-act="last-minus" aria-label="minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus" aria-label="plus">+</button></span></div></div>
@@ -963,6 +963,13 @@ function viewHistory() {
 }
 
 // ---------- Mehr ----------
+function animInfo() {
+  const a = st.settings.anim || 'on', sys = FX.systemReduced();
+  if (a === 'off') return 'Keine Effekte. Werte und Timer bleiben gleich.';
+  if (a === 'on') return `Alle Effekte: Leuchten beim Tippen, Ziffern im Ergebnis, Einblenden, bewegter Hintergrund.${sys ? ' Hinweis: Am Gerät ist „Bewegung reduzieren“ bzw. „Animationen entfernen“ an. Diese Einstellung überstimmt das für EDT Timer.' : ''}`;
+  return sys ? 'Am Gerät ist „Bewegung reduzieren“ bzw. „Animationen entfernen“ an, deshalb nur sanfte Überblendungen ohne Bewegung.'
+    : 'Folgt der Systemeinstellung „Bewegung reduzieren“. Derzeit aus, deshalb alle Effekte.';
+}
 function viewMore() {
   const s = st.settings, standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -980,6 +987,9 @@ function viewMore() {
     <div class="panel">${tg('sound', 'Ton', 'Pieptöne und Ansagen')}${tg('voice', 'Sprachansagen', '„Los“, „Pause 15 Sekunden“, „Noch 3, 2, 1“')}${tg('vibrate', 'Vibration', navigator.vibrate ? 'Android' : 'auf diesem Gerät nicht verfügbar')}${tg('wake', 'Bildschirm wach halten', A.wakeSupported() ? 'Wake Lock' : 'auf diesem Gerät nicht verfügbar')}
       <div class="prow"><span>Vorlauf vor Start</span><div class="seg">${[3, 5, 10].map(v => `<button data-lead="${v}" class="${s.leadIn === v ? 'on' : ''}">${v} s</button>`).join('')}</div></div>
       <button class="btn ghost wide" data-act="testsound">Ton testen</button></div>
+    <h3 class="h3">Animationen</h3>
+    <div class="panel animpanel"><div class="prow"><span>Effekte</span><div class="seg" role="radiogroup" aria-label="Animationen">${[['auto', 'Automatisch'], ['on', 'An'], ['off', 'Aus']].map(([v, l]) => `<button role="radio" aria-checked="${(s.anim || 'on') === v}" data-anim="${v}" class="${(s.anim || 'on') === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <p class="muted" id="anim-info">${animInfo()}</p></div>
     <h3 class="h3">Daten</h3>
     <div class="panel"><p class="muted">Alles bleibt auf diesem Gerät (localStorage). Kein Konto, kein Server, keine Tracker.</p>
       <button class="btn ghost wide" data-act="export">Export als JSON</button>
@@ -988,7 +998,9 @@ function viewMore() {
       <button class="btn ghost wide danger" data-act="wipe">Alle Daten löschen</button></div>
     <h3 class="h3">Installieren</h3>
     <div class="panel"><p class="muted">${standalone ? 'Läuft als installierte App. Funktioniert offline.' : ios ? 'Safari: Teilen-Symbol → „Zum Home-Bildschirm“. Danach offline nutzbar.' : 'Chrome: Menü → „App installieren“ oder Knopf unten.'}</p>
-      ${st.installEvt ? '<button class="btn primary wide" data-act="install">App installieren</button>' : ''}</div>
+      ${st.installEvt ? '<button class="btn primary wide" data-act="install">App installieren</button>' : ''}
+      <div class="prow verrow"><span>Version</span><b id="app-ver">${VERSION}</b></div>
+      <button class="btn ghost wide" data-act="sw-check">Nach neuer Version suchen</button></div>
     <p class="muted center">EDT Timer · Escalating Density Training</p>
   </main>${tabs('more')}`;
 }
@@ -1016,8 +1028,8 @@ function applyFx() {
   if (st.view === 'result' && st.fxScramble) {
     st.fxScramble = false;
     const big = $('.hero .huge'), hero = $('.hero');
-    FX.scramble(big, { dur: 1100, onDone: () => { if (hero?.classList.contains('pr') && !FX.reduced()) hero.classList.add('flash'); } });
-    app.querySelectorAll('.grid3 b').forEach((b, i) => FX.scramble(b, { dur: 800 + i * 100 }));
+    FX.scramble(big, { dur: 1200, onDone: () => { if (hero?.classList.contains('pr') && FX.mode() !== 'off') hero.classList.add('flash'); } });
+    app.querySelectorAll('.grid3 b').forEach((b, i) => FX.scramble(b, { dur: 900 + i * 120 }));
   }
 }
 function go(view) {
@@ -1059,6 +1071,7 @@ app.addEventListener('click', e => {
   if (d.dex) { st.devEx = d.dex === '__all' ? null : d.dex; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
   if (d.dlim) { st.devLim = +d.dlim; st.devPt = null; st.devAnim = true; return render(); }
   if (d.lead) { st.settings.leadIn = +d.lead; store.saveSettings(st.settings); return render(); }
+  if (d.anim) { st.settings.anim = d.anim; store.saveSettings(st.settings); FX.setPref(d.anim); return render(); }
   if (d.pv != null) { st.partialVal = +d.pv; return render(); }
   if (d.pst) { planStep(d.pst, +d.i, +d.d); return render(); }
   if (d.rate) { E.rateLastSet(s, d.rate); store.saveActive(s); A.cue.tap(); return render(); }
@@ -1151,6 +1164,7 @@ app.addEventListener('click', e => {
     case 'templates': st.workouts = store.restoreTemplates(); return toast('Vorlagen wiederhergestellt');
     case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
     case 'install': st.installEvt?.prompt(); st.installEvt = null; return render();
+    case 'sw-check': return checkUpdate(true);
   }
 });
 app.addEventListener('input', e => {
@@ -1189,7 +1203,7 @@ if ((st.settings.planVer || 0) < 2) {
   store.saveWorkouts(st.workouts); st.settings.planVer = 2; store.saveSettings(st.settings);
 }
 if (migrated.length) setTimeout(() => toast('Daten aus RepZeit übernommen'), 400);
-FX.initGlow(); st.fxReveal = true;
+FX.setPref(st.settings.anim || 'on'); FX.initGlow(); st.fxReveal = true;
 const needSetup = () => !st.settings.setupDone && !Object.values(st.maxes).some(l => l && l.length);
 
 // Laufendes Training nach Neuladen fortsetzen
@@ -1204,4 +1218,30 @@ else {
   else render();
 }
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+// v1.6.1 Updates: neuer Service Worker übernimmt sofort (skipWaiting + clients.claim). Danach automatisch neu laden,
+// außer während Training/Test/Bearbeiten – dort Hinweis „Neue Version verfügbar – neu laden“. Beim Zurückkehren in die
+// App (auch iOS-Home-Bildschirm, der die Seite im Speicher hält) wird nach Updates gesucht.
+const swOk = 'serviceWorker' in navigator && location.protocol !== 'file:';
+let swReg = null, swReloading = false;
+const busy = () => ['train', 'assess', 'edit', 'plan'].includes(st.view) || !!st.session;
+function updateBanner() {
+  if (document.querySelector('.updbar')) return;
+  const b = document.createElement('div'); b.className = 'updbar'; b.setAttribute('role', 'status');
+  b.innerHTML = '<span>Neue Version verfügbar</span><button class="btn primary sm" data-upd="reload">Neu laden</button>';
+  b.querySelector('button').addEventListener('click', () => { swReloading = true; location.reload(); });
+  document.body.appendChild(b);
+}
+function onNewVersion() { if (swReloading) return; if (busy()) updateBanner(); else { swReloading = true; location.reload(); } }
+async function checkUpdate(manual) {
+  if (!swReg) { if (manual) toast('Service Worker nicht aktiv'); return; }
+  try { await swReg.update(); } catch { if (manual) toast('Keine Verbindung'); return; }
+  if (manual && !swReg.installing && !swReg.waiting) toast(`Aktuell: ${VERSION}`);
+}
+st.checkUpdate = checkUpdate;
+if (swOk) {
+  const hadCtrl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(r => { swReg = r; }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtrl) onNewVersion(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
+  window.addEventListener('pageshow', e => { if (e.persisted) checkUpdate(false); });
+}
