@@ -24,16 +24,16 @@ RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
 END:STANDARD
 END:VTIMEZONE
 BEGIN:VEVENT
-UID:edt-pmvw1kay3uahk@edt-timer
+UID:edt-pmvw1kbmuumym@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261102T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=MO
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -48,16 +48,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay3vkjz@edt-timer
+UID:edt-pmvw1kbmuvayu@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261102T120000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=MO
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -72,16 +72,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay3wtaz@edt-timer
+UID:edt-pmvw1kbmuwuoh@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261102T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=MO
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -96,16 +96,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1gqqo@edt-timer
+UID:edt-pmvw1kd5i1gcgb@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261103T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=TU
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -120,16 +120,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1hr95@edt-timer
+UID:edt-pmvw1kd5i1hhkv@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261103T120000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=TU
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -144,16 +144,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1iveu@edt-timer
+UID:edt-pmvw1kd5i1iww2@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261103T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=TU
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -168,16 +168,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay310gbx@edt-timer
+UID:edt-pmvw1kbmu10rm1@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261104T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=WE
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -192,16 +192,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay311z7z@edt-timer
+UID:edt-pmvw1kbmu11mab@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261104T130000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=WE
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -216,16 +216,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay312wsu@edt-timer
+UID:edt-pmvw1kbmu124qg@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261104T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=WE
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -240,16 +240,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1jogv@edt-timer
+UID:edt-pmvw1kd5i1jnnt@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261105T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=TH
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -264,16 +264,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1k8km@edt-timer
+UID:edt-pmvw1kd5i1kr1g@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261105T120000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=TH
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -288,16 +288,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kcfs1ltfn@edt-timer
+UID:edt-pmvw1kd5i1l8vg@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261105T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=TH
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -312,16 +312,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay316hay@edt-timer
+UID:edt-pmvw1kbmu16gzr@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261106T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=FR
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -336,16 +336,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay317145@edt-timer
+UID:edt-pmvw1kbmu17ho6@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261106T130000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=FR
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -360,16 +360,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay3189j8@edt-timer
+UID:edt-pmvw1kbmu18bpt@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261106T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=FR
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -384,16 +384,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay3192ev@edt-timer
+UID:edt-pmvw1kbmu19meo@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261031T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=SA
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -408,16 +408,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay31a1bq@edt-timer
+UID:edt-pmvw1kbmu1aiox@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261031T130000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=SA
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -432,16 +432,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay31bnp1@edt-timer
+UID:edt-pmvw1kbmu1bv3j@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261031T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=SA
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -456,16 +456,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay31c7eg@edt-timer
+UID:edt-pmvw1kbmu1cjac@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261101T080000
 DURATION:PT10M
 RRULE:FREQ=WEEKLY;BYDAY=SU
 SUMMARY:EDT Liegestütze · 5 min
-DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-liegestuetz-5
-URL:http://127.0.0.1:18735/?w=tpl-liegestuetz-5
+DESCRIPTION:Liegestütz-EDT 5 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-liegestuetz-5
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-liegestuetz-5
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -480,16 +480,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay31df2o@edt-timer
+UID:edt-pmvw1kbmu1dmzu@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261101T130000
 DURATION:PT15M
 RRULE:FREQ=WEEKLY;BYDAY=SU
 SUMMARY:EDT Kniebeugen · 10 min
-DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: http://127.0.0.1:187
- 35/?w=tpl-kniebeugen-10
-URL:http://127.0.0.1:18735/?w=tpl-kniebeugen-10
+DESCRIPTION:Kniebeugen-EDT 10 min\nIn der App starten: https://thundertiger
+ 187.github.io/edt-timer/?w=tpl-kniebeugen-10
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-kniebeugen-10
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM
@@ -504,16 +504,16 @@ TRIGGER:-PT15M
 END:VALARM
 END:VEVENT
 BEGIN:VEVENT
-UID:edt-pmvw1kay31ego6@edt-timer
+UID:edt-pmvw1kbmu1ejvq@edt-timer
 SEQUENCE:1
-DTSTAMP:20261031T065009Z
+DTSTAMP:20261031T065010Z
 DTSTART;TZID=Europe/Berlin:20261101T190000
 DURATION:PT13M
 RRULE:FREQ=WEEKLY;BYDAY=SU
 SUMMARY:EDT Klimmzüge · 8 min
-DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: http://127.0.0.1:18735/
- ?w=tpl-klimmzug-8
-URL:http://127.0.0.1:18735/?w=tpl-klimmzug-8
+DESCRIPTION:Klimmzug-EDT 8 min\nIn der App starten: https://thundertiger187
+ .github.io/edt-timer/?w=tpl-klimmzug-8
+URL:https://thundertiger187.github.io/edt-timer/?w=tpl-klimmzug-8
 CATEGORIES:EDT Timer
 TRANSP:OPAQUE
 BEGIN:VALARM

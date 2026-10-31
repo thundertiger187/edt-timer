@@ -29,7 +29,8 @@ await page.reload(); await page.waitForSelector('.extiles');
 // ---------- Strichmännchen ----------
 assert.equal(await page.$$eval('.extile svg.fig[data-anim]', e => e.length), 4);
 const pts = () => page.$eval('.extile svg.fig[data-fig="Liegestütze"] [data-k=arm]', e => e.getAttribute('points'));
-const a1 = await pts(); await page.clock.runFor(500); const a2 = await pts(); assert.notEqual(a1, a2);
+const seen = new Set(); for (let i = 0; i < 4; i++) { seen.add(await pts()); await page.clock.runFor(300); }
+assert.ok(seen.size >= 3, [...seen].join(' | ')); const [a1, a2] = [...seen];
 ok('Startseite: 4 animierte Strichmännchen in den Übungskacheln', `Arm ${a1} → ${a2}`);
 const FN = { 'Liegestütze': 'liegestuetze', 'Kniebeugen': 'kniebeugen', 'Dips': 'dips', 'Klimmzüge': 'klimmzuege' };
 for (const ex of Object.keys(FN)) {
