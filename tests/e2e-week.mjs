@@ -95,7 +95,7 @@ const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data
 assert.equal(dl.suggestedFilename(), 'edt-wochenplan.ics');
 const ics = fs.readFileSync(await dl.path(), 'utf8'), u = ics.replace(/\r\n /g, '');
 fs.writeFileSync(path.join(ROOT, 'tests', 'beispiel-wochenplan.ics'), ics);
-assert.ok(ics.includes('\r\n')); assert.equal((u.match(/BEGIN:VEVENT/g) || []).length, 21 + (u.match(/STATUS:CANCELLED/g) || []).length);
+assert.ok(ics.includes('\r\n')); assert.equal((u.match(/BEGIN:VEVENT/g) || []).length, 21); assert.ok(!u.includes('CANCELLED'), 'vor dem ersten Export gelöschte Einträge werden nicht abgesagt');
 assert.match(u, /DTSTART;TZID=Europe\/Berlin:20261031T080000\r\nDURATION:PT10M\r\nRRULE:FREQ=WEEKLY;BYDAY=SA/);
 assert.match(u, /DTSTART;TZID=Europe\/Berlin:20261102T120000\r\nDURATION:PT15M\r\nRRULE:FREQ=WEEKLY;BYDAY=MO/);
 assert.equal((u.match(/TRIGGER:-PT15M/g) || []).length, 21); assert.equal((u.match(/TRIGGER:PT0M/g) || []).length, 21);
@@ -107,11 +107,14 @@ await shot('31_export_kalender.png');
 ok('Kalender-Export .ics: 21 wöchentliche Termine, TZID Europe/Berlin, VALARM zur Startzeit + 15 min vorher, Link zur App', uid1);
 // Änderung → Hinweis neu exportieren, gleiche UID beim nächsten Export
 await page.locator(`${sat} .wtime`).nth(2).fill('19:30'); await page.locator(`${sat} .wtime`).nth(2).dispatchEvent('change');
+const sunUid = await page.evaluate(() => __rz.week.entries.find(e => e.day === 6 && e.time === '19:00').id);
+await page.locator('.wday[data-day="6"] .wrow [data-act=wdel]').nth(2).click();
 assert.match(await page.textContent('.remind'), /Plan seit dem Export am 31\.10\. geändert\. Neu exportieren/);
 const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ics]')]);
 const u2 = fs.readFileSync(await dl2.path(), 'utf8').replace(/\r\n /g, '');
 assert.ok(u2.includes(`UID:${uid1}`)); assert.match(u2, /SEQUENCE:2/); assert.match(u2, /20261031T193000/);
-ok('Plan geändert → Hinweis „neu exportieren“; Re-Export mit gleicher UID und SEQUENCE 2');
+assert.equal((u2.match(/BEGIN:VEVENT/g) || []).length, 21); assert.match(u2, new RegExp(`UID:edt-${sunUid}@edt-timer[\\s\\S]*?STATUS:CANCELLED`)); assert.equal((u2.match(/STATUS:CANCELLED/g) || []).length, 1);
+ok('Plan geändert (Sa 19:30, So 19:00 gelöscht) → Hinweis „neu exportieren“; Re-Export mit gleicher UID, SEQUENCE 2, gelöschter Termin als STATUS:CANCELLED');
 
 // ---------- Heute ----------
 await page.click('[data-go=home]'); await page.waitForSelector('.panel.today');
@@ -160,10 +163,10 @@ ok('Link aus dem Kalendertermin öffnet den Plan des Workouts');
 await page.click('[data-go=home]'); await page.click('[data-go=more]');
 const [dj] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=export]')]);
 const data = JSON.parse(fs.readFileSync(await dj.path(), 'utf8'));
-assert.equal(data.plan.entries.length, 21);
+assert.equal(data.plan.entries.length, 20);
 await page.evaluate(() => localStorage.removeItem('edt.plan'));
 await page.setInputFiles('#f-import', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
-await page.waitForFunction(() => __rz.week.entries.length === 21);
+await page.waitForFunction(() => __rz.week.entries.length === 20);
 ok('Wochenplan in Export/Import enthalten');
 
 // ---------- reduzierte Bewegung ----------

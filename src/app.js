@@ -225,8 +225,11 @@ function weekAdd(day) {
 const resolveEx = ex => (st.workouts.find(w => w.exercise === ex && w.auto.enabled) || st.workouts.find(w => w.exercise === ex))?.id || null;
 async function exportIcs() {
   st.week.seq = (st.week.seq || 0) + 1;
-  const ics = W.buildIcs(st.week, { info: winfo, url: new URL('./', location.href).href, now: new Date(now()) });
-  st.week.exportedSig = W.planSig(st.week); st.week.exportedAt = new Date(now()).toISOString(); st.week.removed = []; saveWeek();
+  // Absagen nur für Termine, die schon einmal im Kalender gelandet sind
+  const cancel = st.week.removed.filter(id => st.week.exported.includes(id) && !st.week.entries.some(e => e.id === id));
+  const ics = W.buildIcs({ ...st.week, removed: cancel }, { info: winfo, url: new URL('./', location.href).href, now: new Date(now()) });
+  st.week.exportedSig = W.planSig(st.week); st.week.exportedAt = new Date(now()).toISOString(); st.week.removed = [];
+  st.week.exported = st.week.entries.map(e => e.id); saveWeek();
   const name = 'edt-wochenplan.ics', file = new File([ics], name, { type: 'text/calendar' });
   window.__lastIcs = ics; // für Tests
   try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'EDT Wochenplan' }); render(); return; } }
