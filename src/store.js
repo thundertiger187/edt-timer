@@ -19,7 +19,8 @@ export const migrated = typeof localStorage !== 'undefined' ? migrateLegacy() : 
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
 
-export const DEFAULT_SETTINGS = { sound: true, voice: true, vibrate: true, wake: true, leadIn: 5, exSel: 'Liegestütze', asked: [], setupDone: false, planVer: 0 };
+export const DEFAULT_SETTINGS = { sound: true, voice: true, vibrate: true, wake: true, leadIn: 5, exSel: 'Liegestütze', asked: [], setupDone: false, planVer: 0,
+  recAfterTest: 10, recEdt: 10, recTests: 10, recNotify: true, recWatch: null, dayTipSeen: false };
 
 export const store = {
   workouts() { const w = read(K.w, null); if (!w) { write(K.w, TEMPLATES); return structuredClone(TEMPLATES); } return w.map(normalizeWorkout); },

@@ -61,6 +61,33 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Erholung je Muskelgruppe (v1.3.0)
+
+Das Maximum aus dem Fitnesstest gilt für **erholte** Muskeln. Direkt nach einem Satz bis zum Muskelversagen sind die beteiligten Muskeln ermüdet; ein EDT mit Satzgrößen aus dem Maximum würde dann zu früh scheitern.
+
+| Abstand (gleiche oder überlappende Muskelgruppe) | Standard |
+|---|---|
+| Fitnesstest → erstes EDT | 10 min |
+| EDT → EDT | 10 min |
+| Fitnesstest → Fitnesstest | 10 min |
+
+Alle Werte sind unter **Mehr → Erholung** änderbar (0–60 min).
+
+**Begründung:** Nach einem Satz bis zum Versagen ist ein großer Teil der Kraft nach wenigen Minuten zurück, die volle Wiederholungszahl aber erst nach längerer Pause. 10 min sind ein praxistauglicher Mindestabstand innerhalb einer Einheit. Die beste Grundlage ist ein Fitnesstest am Vortag, vor allem vor intensiven Trainingstagen.
+
+**Muskelgruppen:** Liegestütze und Dips = Brust/Trizeps/Schulter (überlappen), Kniebeugen = Beine, Klimmzüge = Rücken/Bizeps. Eigene Übungen: Gruppe im Editor wählbar, Standard „eigene“ (keine Überlappung mit anderen Übungen). Andere Gruppen sind sofort frei, z. B. morgens Liegestütze, mittags Kniebeugen, abends Klimmzüge.
+
+**Anzeige:** Hinweis mit Countdown nach dem Fitnesstest (zeitstempelbasiert, übersteht Neuladen), Status „erholt“/„Erholung noch m:ss“ auf Startseite und Plan, optional Meldung per Ton + Sprache und, falls erlaubt, Benachrichtigung, sobald die Gruppe erholt ist.
+
+**Trotzdem starten:** Satzgrößen werden nur für diese Einheit reduziert:
+
+```
+Faktor = 1 − 0,20 × min(1, Restzeit / Erholungszeit)
+Wdh. pro Satz = max(1, runden(Wdh. × Faktor))
+```
+
+Beispiel: 8 von 10 min fehlen → −16 % → 10 → 8 Wdh. Die Einheit wird als „verkürzte Erholung“ markiert, zählt nicht für die Phasen-Anpassung und ändert weder Maximum noch gespeicherte Anpassung.
+
 ## Umbenennung RepZeit → EDT Timer (v1.2.0)
 
 - Repository `thundertiger187/repzeit` → `thundertiger187/edt-timer`. Unter `thundertiger187/repzeit` liegt nur noch eine Weiterleitung (`index.html`, `404.html` für Unterpfade, `sw.js` zum Abmelden des alten Service Workers).

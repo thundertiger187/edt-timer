@@ -58,13 +58,29 @@ const tpl = await page.evaluate(() => __rz.workouts.find(w => w.id === 'tpl-lieg
 assert.deepEqual(tpl, [{ reps: 10, restSec: 15, rounds: 4 }, { reps: 10, restSec: 20, rounds: 2 }, { reps: 8, restSec: 20, rounds: null }]);
 await shot('06_fitnesstest_gespeichert.png');
 ok('Gespeichert: max 25, Zeit 50 s, Vorlage auf 3 Phasen abgeleitet');
+// v1.3: Hinweis Erholung nach dem Test
+const hint = await page.textContent('.rechint');
+assert.match(hint, /Dein Maximum gilt für erholte Muskeln\. Mach mindestens 10 min Pause, bevor du das EDT für Brust\/Trizeps\/Schulter startest\./);
+assert.match(hint, /EDT über den Tag verteilen: z\. B\. morgens Liegestütze, mittags Kniebeugen, abends Klimmzüge/);
+assert.match(hint, /Test am Vortag/);
+const cd1 = await page.textContent('.rechint .recclock b'); assert.match(cd1, /^(10:00|9:5\d)$/);
+await run(2000); const cd2 = await page.textContent('.rechint .recclock b'); assert.notEqual(cd1, cd2);
+assert.match(await page.textContent('.chips'), /Dips · Erholung \d+:\d\d/); // Dips teilt die Muskelgruppe
+await page.evaluate(() => document.querySelector('.rechint').scrollIntoView({ block: 'start' }));
+await shot('24_hinweis_nach_test.png');
+// Countdown überlebt Neuladen (zeitstempelbasiert)
+await page.reload(); await page.waitForSelector('.extiles');
+const recHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exrec').textContent])));
+assert.match(recHome['Liegestütze'], /^Erholung noch (9:\d\d|10:00)$/); assert.match(recHome['Dips'], /^Erholung noch/); assert.equal(recHome['Kniebeugen'], 'erholt');
+ok('Hinweis nach Test: 10 min Pause für Brust/Trizeps/Schulter, Countdown läuft, Tagesverteilung + Vortag-Tipp', cd2);
+await page.click('[data-exsel="Klimmzüge"]'); await page.waitForSelector('.howto'); // ungetestete Übung öffnet den Test
 // nächste Übung: Klimmzüge ohne Test per Zahl
-await page.click('[data-act=assess-pick][data-aex="Klimmzüge"]'); await page.waitForSelector('.howto');
 await page.click('[data-act=assess-direct]'); await page.waitForSelector('#a-num');
 await page.fill('#a-num', '8');
 const kl = await page.$$eval('#a-plan .pl', e => e.map(x => x.textContent));
 assert.match(kl[0], /3 Wdh \/ 25 s Pause/); assert.match(kl[1], /3 Wdh \/ 30 s Pause/); assert.match(kl[2], /2 Wdh \/ 30 s Pause/);
 await page.click('[data-act=assess-save]'); await page.waitForSelector('.hero');
+assert.equal(await page.$$eval('.rechint', e => e.length), 0); // Eingabe ohne Test: keine Erholung nötig
 await page.click('[data-act=assess-finish]'); await page.waitForSelector('.extiles');
 assert.equal(await page.evaluate(() => __rz.settings.setupDone), true);
 ok('Nächste Übung: Klimmzüge 8 per Eingabe → 3/25 s, 3/30 s, 2/30 s; Fertig → Startseite');
@@ -72,6 +88,8 @@ await page.click('[data-exsel="Liegestütze"]');
 assert.match(await page.textContent('.maxbar'), /25.*Fitnesstest wiederholen/s);
 await page.waitForTimeout(500);
 await shot('07_start_nach_setup.png');
+await shot('25_start_erholungsstatus.png');
+ok('Startseite: Liegestütze/Dips „Erholung noch m:ss“, Kniebeugen/Klimmzüge „erholt“', recHome['Liegestütze']);
 
 // ---------- Editor ----------
 await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=edit]'); await page.waitForSelector('#f-name');
@@ -101,6 +119,19 @@ await shot('15_phasen_editor.png');
 await page.click('[data-act=plan-del][data-i="3"]'); await page.click('[data-act=plan-reset]');
 assert.deepEqual(await labels(), P3);
 ok('Phasen-Editor: „Start ab Satz 6“ → Phase 1 0:00–2:55, 4. Phase, Zurücksetzen');
+
+// ---------- Warnung vor dem Start (Erholung läuft noch) ----------
+assert.match(await page.textContent('.recbox'), /Brust\/Trizeps\/Schulter: Erholung noch \d+:\d\d/);
+await page.click('[data-act=plan-start]'); await page.waitForSelector('.recsheet');
+const sheet = await page.textContent('.recsheet');
+assert.match(sheet, /Noch nicht erholt/); assert.match(sheet, /Fitnesstest Liegestütze um 12:0\d/); assert.match(sheet, /Trotzdem starten: Satzgrößen −1\d % nur für diese Einheit \(10 → 8, 10 → 8, 8 → [67] Wdh\.\)/);
+assert.match(sheet, /Oder später am Tag trainieren\./);
+await shot('26_warnung_erholung.png');
+await page.click('[data-act=rec-wait]'); await page.waitForSelector('.recbox.big');
+assert.equal(await page.$$eval('.recsheet', e => e.length), 0);
+const leftMs = await page.evaluate(() => +document.querySelector('.recbox [data-until]').dataset.until - Date.now());
+await run(leftMs + 1500); await page.waitForSelector('.recbox.ok');
+ok('Warndialog „Noch nicht erholt“ mit Warten/Trotzdem starten + „Oder später am Tag“; Warten → Countdown → erholt', `${Math.round(leftMs / 1000)} s gewartet`);
 
 // ---------- Training (3 Phasen) ----------
 await page.click('[data-act=plan-start]'); await page.waitForSelector('#t-lead');
@@ -137,9 +168,27 @@ assert.match(tune1, /Ab Satz 8 \(Phase 3\) nicht geschafft/); assert.match(tune1
 await page.evaluate(() => document.querySelector('.panel.tune').scrollIntoView({ block: 'center' }));
 await shot('17_vorschlag_nach_training.png');
 ok('Vorschlag nach Fehlschlag in Satz 8: Phase 3 auf 7 Wdh.');
+// v1.3: Nächstes EDT + freie andere Muskelgruppe
+const nx = await page.textContent('.nextrec');
+assert.match(nx, /Nächstes EDT für Brust\/Trizeps\/Schulter ab \d\d:\d\d Uhr/); assert.match(nx, /Jetzt frei: (Kniebeugen|Klimmzüge)/);
+assert.match(nx, /EDT über den Tag verteilen/);
+await page.evaluate(() => document.querySelector('.nextrec').scrollIntoView({ block: 'center' }));
+await shot('27_ergebnis_naechstes_edt.png');
+const histLen = await page.evaluate(() => __rz.history.length);
+await page.click('[data-act=rec-other]'); await page.waitForSelector('.recbox.ok');
+const otherEx = await page.evaluate(() => __rz.workouts.find(w => w.id === __rz.plan.workoutId).exercise);
+await page.click('[data-act=plan-start]'); await page.waitForSelector('#t-lead'); // ohne Warnung
+assert.equal(await page.$$eval('.recsheet', e => e.length), 0);
+await page.click('[data-act=cancel-lead]');
+assert.equal(await page.evaluate(() => __rz.history.length), histLen);
+ok('Ergebnis: „Nächstes EDT ab hh:mm“, Wechsel auf andere Muskelgruppe startet ohne Warten', otherEx);
+await page.goto(base); await page.waitForSelector('.extiles');
+assert.match(await page.textContent('.extile:has-text("Liegestütze") .exrec'), /Erholung noch/);
+await run(10 * 60000);
+await page.click('[data-exsel="Liegestütze"]');
 
 // 2. Einheit schneller → Bestwert, Neutest-Empfehlung, Vorschlag „später“
-await page.click('[data-act=again]'); await page.click('[data-act=plan-start]'); await run(5100); await page.waitForSelector('[data-act=done]');
+await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await page.click('[data-act=plan-start]'); await page.waitForSelector('#t-lead'); await run(5100); await page.waitForSelector('[data-act=done]');
 for (;;) {
   s = await S(); if (!s || s.status === 'partial') break;
   if (s.status === 'work' && s.left < 25000) await run(s.left + 300);
@@ -172,6 +221,7 @@ await page.click('[data-go=more]'); await page.waitForSelector('.maxpanel');
 await shot('20_mehr_fitnesstest.png');
 await page.click('.maxpanel .mrow:has-text("Liegestütze") [data-act=assess]'); await page.waitForSelector('.howto');
 assert.match(await page.textContent('main'), /Bisher: 25 am 30\.10\.2026/);
+assert.match(await page.textContent('main'), /Brust\/Trizeps\/Schulter noch nicht erholt \(EDT Liegestütze bis/);
 await page.click('[data-act=assess-test]'); await run(3100); await page.waitForSelector('#a-time'); await run(57000);
 await page.click('[data-act=assess-stop]'); await page.fill('#a-num', '30');
 await page.click('[data-act=assess-save]'); await page.waitForSelector('.hero');
@@ -241,6 +291,43 @@ await ctx.setOffline(false);
   await p2.click('[data-go=history]'); await p2.waitForSelector('.hitem'); assert.match(await p2.textContent('.hlist'), /88/);
   await c2.close();
   ok('Migration repzeit.* → edt.*: Maximum, Verlauf, Anpassung, Einstellungen übernommen; Vorlage auf 3 Phasen');
+}
+
+// ---------- Trotzdem starten: verkürzte Erholung ----------
+{
+  const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'de-DE' }); const p3 = await c3.newPage();
+  p3.on('pageerror', e => errors.push(e.message));
+  await p3.clock.install({ time: new Date('2026-10-30T18:00:00+01:00') });
+  for (let i = 0; ; i++) { try { await p3.goto(base); break; } catch (e) { if (i >= 2) throw e; await p3.waitForTimeout(1500); } }
+  await p3.waitForSelector('.setup');
+  await p3.evaluate(() => {
+    localStorage.setItem('edt.maxes', JSON.stringify({ 'Liegestütze': [{ v: 25, date: new Date(Date.now() - 120000).toISOString(), source: 'test', durMs: 50000 }] }));
+    localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, exSel: 'Liegestütze', asked: ['Liegestütze'], planVer: 2, sound: false, voice: false }));
+  });
+  await p3.reload(); await p3.waitForSelector('.extiles');
+  await p3.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await p3.click('[data-act=plan-start]'); await p3.waitForSelector('.recsheet');
+  assert.match(await p3.textContent('.cutnote'), /−16 % nur für diese Einheit \(10 → 8, 10 → 8, 8 → 7 Wdh\.\)/);
+  await p3.click('[data-act=rec-force]'); await p3.waitForSelector('.srbadge');
+  assert.match(await p3.textContent('.srbadge'), /Verkürzte Erholung · Sätze −16 %/);
+  await p3.clock.runFor(5100); await p3.waitForSelector('[data-act=done]');
+  const S3 = () => p3.evaluate(() => { const s = __rz.session; return s && { status: s.status, target: s.target, left: s.endsAt - Date.now(), shortRec: s.shortRec, phases: s.phases.map(p => p.reps) }; });
+  let q = await S3(); assert.equal(q.target, 8); assert.deepEqual(q.phases, [8, 8, 7]); assert.equal(q.shortRec.pct, 16);
+  assert.match(await p3.textContent('.pos'), /verkürzte Erholung −16 %/);
+  for (;;) {
+    q = await S3(); if (!q || q.status === 'partial') break;
+    if (q.status === 'work' && q.left < 25000) await p3.clock.runFor(q.left + 300);
+    else if (q.status === 'work') { await p3.clock.runFor(14000); if ((await S3())?.status === 'work') await p3.click('[data-act=done]'); }
+    else await p3.clock.runFor(1000);
+  }
+  if (q) { await p3.waitForSelector('.numgrid'); await p3.click('[data-pv="3"]'); await p3.click('[data-act=partial-ok]'); }
+  await p3.waitForSelector('.hero');
+  assert.match(await p3.textContent('main'), /Verkürzte Erholung: Satzgrößen −16 %\. Zählt nicht für die Phasen-Anpassung/);
+  assert.equal(await p3.$$eval('.panel.tune', e => e.length), 0);
+  const st3 = await p3.evaluate(() => ({ tunes: JSON.parse(localStorage.getItem('edt.tunes') || '{}'), maxes: JSON.parse(localStorage.getItem('edt.maxes')), h: JSON.parse(localStorage.getItem('edt.history')).at(-1), w: __rz.workouts.find(w => w.id === 'tpl-liegestuetz-5').phases.map(p => p.reps) }));
+  assert.deepEqual(st3.tunes, {}); assert.equal(st3.maxes['Liegestütze'].length, 1); assert.equal(st3.h.shortRec.pct, 16); assert.deepEqual(st3.w, [10, 10, 8]);
+  await p3.screenshot({ path: path.join(SCREENS, '28_ergebnis_verkuerzte_erholung.png') });
+  await c3.close();
+  ok('Trotzdem starten: 8 min Rest → −16 % (10→8, 8→7), markiert, kein Vorschlag, Max/Anpassung/Workout unverändert');
 }
 
 assert.deepEqual(errors, [], 'Konsolenfehler: ' + errors.join('; '));

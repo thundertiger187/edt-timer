@@ -296,3 +296,51 @@ test('Migration RepZeit → EDT Timer: repzeit.* wird nach edt.* kopiert, vorhan
   assert.ok(m.has('repzeit.maxes')); assert.ok(m.has('edt.migrated'));
   assert.deepEqual(migrateLegacy(ls), []); // nur einmal
 });
+
+// ---------- v1.3 Erholung ----------
+test('Muskelgruppen: Überschneidung Liegestütze/Dips, getrennt von Beinen und Zug', () => {
+  const m = E.musclesOf;
+  assert.equal(E.overlaps(m('Liegestütze'), m('Dips')), true);
+  assert.equal(E.overlaps(m('Liegestütze'), m('Kniebeugen')), false);
+  assert.equal(E.overlaps(m('Klimmzüge'), m('Dips')), false);
+  assert.equal(E.overlaps(m('Ausfallschritte', 'legs'), m('Kniebeugen')), true);
+  assert.equal(E.overlaps(m('Plank', 'own'), m('Liegestütze')), false);
+  assert.equal(E.overlaps(m('Plank', 'own'), m('Plank', 'own')), true);
+  assert.equal(E.overlaps(m('Plank', 'own'), m('Burpees', 'own')), false);
+  assert.equal(m('Dips').name, 'Brust/Trizeps/Schulter');
+});
+test('Erholung: Restzeit nach Test bzw. EDT, nur für überlappende Gruppen', () => {
+  const T0 = 1_000_000, min = 60000;
+  const ev = [{ type: 'test', exercise: 'Liegestütze', at: T0 }];
+  let r = E.recoveryLeft(ev, { exercise: 'Dips', kind: 'edt' }, null, T0 + 3 * min);
+  assert.equal(r.leftMs, 7 * min); assert.equal(r.needMs, 10 * min); assert.equal(r.until, T0 + 10 * min);
+  assert.equal(E.recoveryLeft(ev, { exercise: 'Kniebeugen' }, null, T0 + min).leftMs, 0);
+  assert.equal(E.recoveryLeft(ev, { exercise: 'Liegestütze' }, null, T0 + 10 * min).leftMs, 0);
+  // eigene Zeiten
+  r = E.recoveryLeft(ev, { exercise: 'Liegestütze', kind: 'edt' }, { afterTest: 20 }, T0 + 5 * min);
+  assert.equal(r.leftMs, 15 * min);
+  r = E.recoveryLeft(ev, { exercise: 'Liegestütze', kind: 'test' }, { betweenTests: 4 }, T0 + min);
+  assert.equal(r.leftMs, 3 * min);
+  // spätestes Ereignis zählt
+  const ev2 = [...ev, { type: 'edt', exercise: 'Dips', at: T0 + 2 * min }];
+  r = E.recoveryLeft(ev2, { exercise: 'Liegestütze' }, { afterTest: 10, betweenEdt: 15 }, T0 + 3 * min);
+  assert.equal(r.until, T0 + 17 * min); assert.equal(r.cause.type, 'edt');
+});
+test('Reduktion bei verkürzter Erholung: linear bis −20 %, mindestens 1 Wdh.', () => {
+  assert.equal(E.shortRestFactor(0, 600000), 1);
+  assert.equal(E.shortRestFactor(600000, 600000), 0.8);
+  assert.ok(Math.abs(E.shortRestFactor(300000, 600000) - 0.9) < 1e-9);
+  assert.ok(Math.abs(E.shortRestFactor(480000, 600000) - 0.84) < 1e-9);
+  assert.equal(E.shortRestFactor(900000, 600000), 0.8);
+  assert.deepEqual(E.reducePhases([{ reps: 10, restSec: 15 }, { reps: 1, restSec: 20 }], 0.8).map(p => p.reps), [8, 1]);
+  assert.deepEqual(E.reducePhases([{ reps: 10 }], 0.84).map(p => p.reps), [8]);
+});
+test('suggestTune ignoriert Einheiten mit verkürzter Erholung', () => {
+  const w = E.normalizeWorkout({ exercise: 'Liegestütze', limitMin: 5, phases: [{ reps: 10, restSec: 15, rounds: 3 }, { reps: 8, restSec: 20, rounds: null }] });
+  const sets = Array.from({ length: 8 }, (_, i) => ({ n: i + 1, target: 10, done: 10, phase: 0, startMs: i * 30000, endMs: i * 30000 + 20000, restSec: 15 }));
+  assert.equal(E.suggestTune({ sets, phases: w.phases, aborted: false, shortRec: { pct: 16 } }), null);
+});
+test('normalizeWorkout behält Muskelgruppe', () => {
+  assert.equal(E.normalizeWorkout({ exercise: 'Plank', muscle: 'legs' }).muscle, 'legs');
+  assert.equal(E.normalizeWorkout({ exercise: 'Plank', muscle: 'xx' }).muscle, 'own');
+});
