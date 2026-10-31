@@ -50,7 +50,7 @@ for (const ex of Object.keys(FN)) {
 ok('Strichmännchen je Übung, Start- und Endposition, Gelenke verbunden', Object.values(FN).map(f => `fig_${f}_start/ende.png`).join(', '));
 
 // ---------- Wochenplan ----------
-assert.ok(await page.isVisible('.todaycard.empty'));
+assert.ok(await page.isVisible('.nx .hplan')); // ohne Wochenplan: Hinweis „Wochenplan anlegen“
 await page.click('[data-go=week]'); await page.waitForSelector('.week');
 await page.click('[data-act=wtpl][data-k=daily3]');
 assert.equal(await page.evaluate(() => __rz.week.entries.length), 21);
@@ -118,21 +118,22 @@ assert.equal((u2.match(/BEGIN:VEVENT/g) || []).length, 21); assert.match(u2, new
 ok('Plan geändert (Sa 19:30, So 19:00 gelöscht) → Hinweis „neu exportieren“; Re-Export mit gleicher UID, SEQUENCE 2, gelöschter Termin als STATUS:CANCELLED');
 
 // ---------- Heute ----------
-await page.click('[data-go=home]'); await page.waitForSelector('.panel.today');
-assert.match(await page.textContent('.tnext'), /Nächste Einheit: 08:00 Liegestütze/);
-assert.deepEqual(await page.$$eval('.trow', e => e.map(x => x.querySelector('.tt').textContent)), ['08:00', '13:00', '19:30']);
-assert.match(await page.textContent('.trow.next'), /erholt/);
-assert.equal(await page.$$eval('.wstrip .wd', e => e.length), 7); assert.match(await page.textContent('.wstrip .wd.today'), /Sa\s*0\/3/);
+await page.click('[data-go=home]'); await page.waitForSelector('.nx');
+assert.equal((await page.textContent('.nx .eyebrow')).trim(), 'Als Nächstes · 08:00'); assert.equal((await page.textContent('.nx .hname')).trim(), 'Liegestütze');
+assert.deepEqual(await page.$$eval('.nx .trow', e => e.map(x => x.querySelector('.tt').textContent)), ['13:00', '19:30']);
+assert.equal(await page.$$eval('.nx .hrec', e => e.length), 0); // erholt: keine Erholungszeile
+assert.equal(await page.$$eval('.nx .wk > div', e => e.length), 7); assert.equal(await page.$eval('.nx .wk .today', e => e.title), '0/3');
 await shot('30_heute.png');
-ok('Startseite „Heute“: nächste Einheit 08:00 Liegestütze, Erholungsstatus, Wochenübersicht');
+ok('Startseite „Heute“: Karte „Als Nächstes · 08:00“ Liegestütze, weitere Einheiten als Zeilen, Wochenpunkte');
 // Ein-Tipp-Start → kurze Einheit, dann abgehakt
-await page.click('.trow.next [data-act=plan-go]'); await page.waitForSelector('#t-lead');
+await page.click('.nx .go'); await page.waitForSelector('#t-lead');
 await page.clock.runFor(5100); await page.waitForSelector('[data-act=done]');
 for (let i = 0; i < 3; i++) { await page.clock.runFor(8000); await page.click('[data-act=done]'); await page.clock.runFor(15500); }
 await page.click('[data-act=quit]'); await page.click('[data-act=quit-save]'); await page.waitForSelector('.hero');
-await page.click('[data-go=home]'); await page.waitForSelector('.panel.today');
-assert.match(await page.textContent('.trow.done'), /08:00.*✓ erledigt/s);
-assert.match(await page.textContent('.tnext'), /13:00 Kniebeugen/); assert.match(await page.textContent('.wstrip .wd.today'), /1\/3/);
+await page.click('[data-go=home]'); await page.waitForSelector('.nx');
+assert.match(await page.textContent('.nx .trow.done'), /08:00.*✓ erledigt/s);
+assert.equal((await page.textContent('.nx .eyebrow')).trim(), 'Als Nächstes · 13:00'); assert.equal((await page.textContent('.nx .hname')).trim(), 'Kniebeugen');
+assert.equal(await page.$eval('.nx .wk .today', e => e.title), '1/3');
 assert.match(await page.textContent('.extile:has-text("Liegestütze") .exrec'), /Erholung noch/);
 await shot('30b_heute_erledigt.png');
 ok('Ein-Tipp-Start aus „Heute“ → Einheit gespeichert → 08:00 automatisch abgehakt, Sa 1/3');

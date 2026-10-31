@@ -479,6 +479,59 @@ export function bestForLimit(history, exercise, limitMin = 5, info) {
   return best;
 }
 
+// ---------- Entwicklung (Verlauf-Diagramm) ----------
+const DAY_MS = 86400000;
+const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+/**
+ * Daten für das Entwicklungsdiagramm der letzten `days` Tage (inkl. heute).
+ * Nur abgeschlossene Einheiten (nicht abgebrochen, total > 0) mit genau `limitMin` Minuten werden gezählt,
+ * damit gleich lange Einheiten verglichen werden. exercise = null → alle Übungen.
+ * Punkt je Tag: eine Übung → beste Einheit des Tages; alle Übungen → Summe der Einheiten des Tages.
+ * tests: Fitnesstest-Maxima der Übung im Zeitraum (nur bei einer Übung). trend: gleitender Mittelwert über 3 Punkte.
+ * summary: Ø der ersten Woche (7 Tage ab erstem Punkt) vs. Ø der letzten 7 Tage; nur wenn sich beide nicht überschneiden.
+ * limits: vorhandene Zeitlimits (min) im Zeitraum für die Auswahl, absteigend nach Anzahl.
+ */
+export function devSeries(history, maxes, { exercise = null, limitMin = null, now, days = 30, info } = {}) {
+  const end = dayStart(now) + DAY_MS, start = end - days * DAY_MS;
+  const ok = (history || []).filter(h => h && !h.aborted && Number.isFinite(+h.total) && +h.total > 0 && Date.parse(h.date) >= start && Date.parse(h.date) < end)
+    .map(h => ({ h, ex: h.exercise ?? (info && h.workoutId ? info(h.workoutId)?.exercise : undefined), lim: sessionLimitMin(h, info), t: Date.parse(h.date) }))
+    .filter(x => x.lim && (exercise == null || x.ex === exercise));
+  const cnt = {}; for (const x of ok) cnt[x.lim] = (cnt[x.lim] || 0) + 1;
+  const limits = Object.keys(cnt).map(Number).sort((a, b) => cnt[b] - cnt[a] || a - b);
+  const lim = limitMin != null && cnt[limitMin] ? limitMin : limits[0] ?? null;
+  const byDay = new Map();
+  for (const x of ok.filter(x => x.lim === lim).sort((a, b) => a.t - b.t)) {
+    const d = dayStart(x.t); if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(x);
+  }
+  const points = [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([day, xs]) => {
+    const best = xs.reduce((b, x) => (+x.h.total > +b.h.total ? x : b));
+    return { day, value: exercise == null ? xs.reduce((a, x) => a + +x.h.total, 0) : +best.h.total,
+      sessions: xs.map(x => ({ id: x.h.id, total: +x.h.total, name: x.h.workoutName || x.h.name || '', exercise: x.ex })), bestId: best.h.id };
+  });
+  const trend = points.length >= 3 ? points.map((p, i) => { const w = points.slice(Math.max(0, i - 2), i + 1); return w.length < 3 ? null : { day: p.day, value: w.reduce((a, q) => a + q.value, 0) / 3 }; }).filter(Boolean) : [];
+  const tests = exercise == null ? [] : ((maxes || {})[exercise] || []).filter(m => m && Number.isFinite(+m.v) && Date.parse(m.date) >= start && Date.parse(m.date) < end)
+    .map(m => ({ day: dayStart(Date.parse(m.date)), t: Date.parse(m.date), value: +m.v, source: m.source }));
+  let summary = null;
+  if (points.length >= 2) {
+    const f0 = points[0].day, l0 = points.at(-1).day;
+    const first = points.filter(p => p.day < f0 + 7 * DAY_MS), last = points.filter(p => p.day > l0 - 7 * DAY_MS);
+    if (f0 + 7 * DAY_MS <= l0 - 6 * DAY_MS) {
+      const avg = l => l.reduce((a, p) => a + p.value, 0) / l.length, a = avg(first), b = avg(last);
+      summary = { first: a, last: b, pct: Math.round((b / a - 1) * 100), nFirst: first.length, nLast: last.length };
+    }
+  }
+  return { start, end, days, limitMin: lim, limits, points, trend, tests, summary };
+}
+/** „Schöne“ Achsenwerte zwischen lo und hi (ca. n Stück). */
+export function niceTicks(lo, hi, n = 4) {
+  if (!(hi > lo)) { hi = lo + 1; }
+  const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag;
+  const out = []; for (let v = Math.floor(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  if (out.at(-1) < hi) out.push(out.at(-1) + step);
+  return out;
+}
+
 // Vorlagen: Phasen = Plan aus einem typischen Mittel-Maximum (werden nach dem Fitnesstest neu berechnet).
 const tpl = (id, name, exercise, limitMin, max, auto, adapt) =>
   ({ id, template: true, name, exercise, limitMin, phases: planFromMax(exercise, max, { ...auto, limitMin }).phases, adapt, auto: { enabled: true, ...auto } });

@@ -371,3 +371,33 @@ test('Rekord 5 min: ältere Einträge (limitMin statt limitMs, nur workoutId, un
   assert.equal(E.sessionLimitMin({ limitMs: 300000 }), 5); assert.equal(E.sessionLimitMin({ limitMin: 5 }), 5);
   assert.equal(E.sessionLimitMin({ workoutId: 'w-lang' }, info), 8); assert.equal(E.sessionLimitMin({}), null);
 });
+
+// ---------- v1.5.0: Entwicklung · 30 Tage ----------
+test('devSeries: nur gleiche Zeitvorgabe, beste Einheit pro Tag, abgebrochene/alte ignoriert', () => {
+  const now = Date.parse('2026-10-31T17:00:00+01:00'), D = 86400000;
+  const h = (id, d, total, lim, ex = 'Liegestütze', extra = {}) => ({ id, workoutId: 'w' + lim, workoutName: `W ${lim}`, exercise: ex, date: new Date(now - d * D).toISOString(), limitMs: lim * 60000, total, ...extra });
+  const hist = [h('a', 40, 50, 5), h('b', 20, 80, 5), h('c', 20, 85, 5), h('d', 19, 200, 10), h('e', 10, 90, 5), h('f', 5, 99, 5, 'Liegestütze', { aborted: true }), h('g', 1, 100, 5), h('k', 2, 30, 5, 'Dips')];
+  const maxes = { 'Liegestütze': [{ v: 20, date: new Date(now - 50 * D).toISOString() }, { v: 25, date: new Date(now - 15 * D).toISOString(), source: 'test' }] };
+  const r = E.devSeries(hist, maxes, { exercise: 'Liegestütze', now });
+  assert.equal(r.limitMin, 5); assert.deepEqual(r.limits, [5, 10]);
+  assert.deepEqual(r.points.map(p => p.value), [85, 90, 100]);
+  assert.equal(r.points[0].bestId, 'c'); assert.equal(r.points[0].sessions.length, 2);
+  assert.deepEqual(r.tests.map(t => t.value), [25]);
+  assert.equal(r.trend.length, 1); assert.ok(Math.abs(r.trend[0].value - 275 / 3) < 1e-9);
+  assert.equal(r.summary.pct, Math.round((100 / 85 - 1) * 100));
+  const r10 = E.devSeries(hist, maxes, { exercise: 'Liegestütze', limitMin: 10, now });
+  assert.deepEqual(r10.points.map(p => p.value), [200]); assert.equal(r10.summary, null);
+});
+test('devSeries: „Alle“ summiert pro Tag, keine Testmarker; leer ohne Daten', () => {
+  const now = Date.parse('2026-10-31T17:00:00+01:00'), D = 86400000;
+  const hist = [{ id: 'a', exercise: 'Liegestütze', date: new Date(now - D).toISOString(), limitMs: 300000, total: 100 }, { id: 'b', exercise: 'Dips', date: new Date(now - D + 3600000).toISOString(), limitMs: 300000, total: 40 }];
+  const r = E.devSeries(hist, { 'Dips': [{ v: 9, date: new Date(now).toISOString() }] }, { exercise: null, now });
+  assert.deepEqual(r.points.map(p => p.value), [140]); assert.deepEqual(r.tests, []);
+  const e = E.devSeries([], {}, { exercise: 'Dips', now });
+  assert.deepEqual(e.points, []); assert.equal(e.summary, null); assert.equal(e.limitMin, null);
+});
+test('niceTicks: runde Achsenwerte, deckt Bereich ab', () => {
+  assert.deepEqual(E.niceTicks(78, 118), [70, 80, 90, 100, 110, 120]);
+  assert.deepEqual(E.niceTicks(0, 9, 3), [0, 5, 10]);
+  const t = E.niceTicks(5, 5); assert.ok(t[0] <= 5 && t.at(-1) >= 5);
+});

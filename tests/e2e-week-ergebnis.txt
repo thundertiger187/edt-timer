@@ -1,13 +1,13 @@
-2026-10-31T09:44:09.152Z https://thundertiger187.github.io/edt-timer/
-✓ Startseite: 4 animierte Strichmännchen in den Übungskacheln – Arm 78.5,61.6 69.2,74.6 76,88 → 81.4,71.1 66.3,76.5 76,88
+2026-10-31T11:52:23.636Z http://127.0.0.1:18735/
+✓ Startseite: 4 animierte Strichmännchen in den Übungskacheln – Arm 77.4,58.7 71.6,73.6 76,88 → 80.3,66.9 67.1,75.9 76,88
 ✓ Strichmännchen je Übung, Start- und Endposition, Gelenke verbunden – fig_liegestuetze_start/ende.png, fig_kniebeugen_start/ende.png, fig_dips_start/ende.png, fig_klimmzuege_start/ende.png
 ✓ Vorlage „Täglich 3×“: 08:00 Liegestütze, 13:00 Kniebeugen, 19:00 Klimmzüge an 7 Tagen, keine Konflikte
 ✓ Vorlage „Mo/Mi/Fr 3×“ und zurück
 ✓ Eintrag 08:10 Dips am Samstag → Warnung „nur 5 min Pause“ gegen 08:00 Liegestütze – 08:00 und 08:10: beide Brust/Trizeps/Schulter, nur 5 min Pause (mind. 10 min nach Ende der ersten Einheit)
 ✓ Montag (12:00 statt 13:00) auf Di und Do kopiert
-✓ Kalender-Export .ics: 21 wöchentliche Termine, TZID Europe/Berlin, VALARM zur Startzeit + 15 min vorher, Link zur App – edt-pmvw1kbmuumym@edt-timer
+✓ Kalender-Export .ics: 21 wöchentliche Termine, TZID Europe/Berlin, VALARM zur Startzeit + 15 min vorher, Link zur App – edt-pmvw1kbjpubdv@edt-timer
 ✓ Plan geändert (Sa 19:30, So 19:00 gelöscht) → Hinweis „neu exportieren“; Re-Export mit gleicher UID, SEQUENCE 2, gelöschter Termin als STATUS:CANCELLED
-✓ Startseite „Heute“: nächste Einheit 08:00 Liegestütze, Erholungsstatus, Wochenübersicht
+✓ Startseite „Heute“: Karte „Als Nächstes · 08:00“ Liegestütze, weitere Einheiten als Zeilen, Wochenpunkte
 ✓ Ein-Tipp-Start aus „Heute“ → Einheit gespeichert → 08:00 automatisch abgehakt, Sa 1/3
 ✓ In-App-Erinnerung um 12:45 (15 min vorher) und 13:00 als Toast + System-Benachrichtigung über den Service Worker (gleicher Tag ersetzt die Vorwarnung) – Jetzt: Kniebeugen (Kniebeugen-EDT 10 min) ./?w=tpl-kniebeugen-10
 ✓ Link aus dem Kalendertermin öffnet den Plan des Workouts

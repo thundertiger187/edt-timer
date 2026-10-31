@@ -61,6 +61,12 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Startseite „Training“ und Entwicklung im Verlauf (v1.5.0)
+- Startseite mit drei Bereichen: **Heute** (Karte für die nächste Einheit mit einem Start-Button, weitere Einheiten des Tages als Zeilen, Woche als Punkte; ohne Wochenplan das zuletzt trainierte Workout und „Wochenplan anlegen“), **Übungen** (2×2 Kacheln + „Eigene Übungen“; Tippen klappt darunter ein Panel mit Fitnesstest, Workouts und „+ Neues Workout“ auf, erneutes Tippen klappt zu, nur eines offen) und **Zuletzt** (zwei letzte Einheiten).
+- Kacheln: „Max am Stück“ (Fitnesstest) und „Rekord 5 min“ (beste abgeschlossene 5-min-Einheit, auch mit verkürzter Erholung; „–“ wenn keine). „Erholung noch m:ss“ nur solange nötig.
+- Tabs: Training / Woche / Verlauf / Mehr. Timer: grünliche Tönung im Satz, cyan in der Pause; Hochrechnung ab Satz 3.
+- Verlauf → „Entwicklung · 30 Tage“: Wdh. pro Einheit (beste Einheit je Tag) für die gewählte Übung oder „Alle“ (Summe je Tag). Es werden nur Einheiten mit **gleicher Zeitvorgabe** verglichen (Standard: häufigste Dauer im Zeitraum, Auswahl per Chip). Fitnesstests als cyan Rauten auf eigener rechter Achse, Trend = gleitender Durchschnitt über 3 Punkte. Die Zeile „±x % Wdh. ggü. erster Woche“ vergleicht den Durchschnitt der ersten 7 Tage mit dem der letzten 7 Tage, nur wenn sich beide Wochen nicht überschneiden.
+
 ## Wochenplan und Erinnerungen (v1.4.0)
 
 - **Tab „Wochenplan“:** pro Wochentag beliebig viele Einträge (Uhrzeit + Workout). Vorlagen: „Täglich 3×“ (08:00 Liegestütze, 13:00 Kniebeugen, 19:00 Klimmzüge) und „Mo/Mi/Fr 3×“. „Kopieren“ übernimmt einen Tag auf andere Tage (Zieltage werden ersetzt).

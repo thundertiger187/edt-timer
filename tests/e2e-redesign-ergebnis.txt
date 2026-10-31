@@ -1,0 +1,18 @@
+2026-10-31T11:52:49.639Z http://127.0.0.1:18738/
+✓ Heute: Header „Training“ + Datum, Karte „Als Nächstes · 19:00“ Klimmzüge, ein Start-Button, Zeilen erledigt/verpasst, Wochenpunkte – done:08:00Liegestütze ✓ erledigt | late:12:00Kniebeugen verpasst · Start ›
+✓ Übungen: 2×2 Kacheln gleich hoch, Figur in eigener Box, „Max am Stück“/„Rekord 5 min“, Zeile „Eigene Übungen“ – Liegestütze: Max am Stück 28 · Rekord 5 min 117 | Kniebeugen: Max am Stück 35 · Rekord 5 min – | Dips: Max am Stück Test offen · Rekord 5 min – | Klimmzüge: Max am Stück 10 · Rekord 5 min –
+✓ Zuletzt: zwei letzte Einheiten – Liegestütz-EDT 5 minSa., 31.10. · 23 Sätze · 23/min115 | Liegestütz-EDT 5 minFr., 30.10. · 23 Sätze · 23,4/min117BEST
+✓ Tabs: Training / Woche / Verlauf / Mehr, aktive Pill
+✓ Aufklappen: Panel volle Breite unter der Reihe, Fitnesstest-Box ohne doppeltes Max, Workouts, „+ Neues Workout“, Rahmen statt grüner Füllung – 2 Workouts
+✓ Nur ein Panel offen, Klimmzüge unter zweiter Reihe
+✓ Zweites Tippen klappt zu
+✓ Eigene Übungen klappt auf/zu
+✓ Ohne Wochenplan: zuletzt trainiertes Workout + „Wochenplan anlegen“
+✓ Timer Satz: grünliche Tönung, „Wdh. gesamt“ groß, „vs. Bestwert“ klein, Hochrechnung ab Satz 3 – 52px vs 20px
+✓ Timer Pause: cyan Tönung, Bewertung + „Letzter Satz“ kompakt in einer Box
+✓ Verlauf: vorausgewählter Chip in den sichtbaren Bereich gescrollt
+✓ Entwicklung Liegestütze: 14 Punkte, 3 Fitnesstests (rechte Achse), Trend, Zusammenfassung – +32 % Wdh. ggü. erster Woche (Ø 86 → 114)
+✓ Punkt antippen → Datum, Wdh., Workout – Sa., 31.10. · 115 Wdh. · Liegestütz-EDT 5 min
+✓ Alle + Dauer 8 min → 5 Punkte (Klimmzüge)
+✓ Leerer Zustand
+✓ Keine JS-Fehler

@@ -14,6 +14,8 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => m.type() === 'error' && errors.push(m.text()));
 const log = []; const ok = (name, extra = '') => { log.push(`✓ ${name}${extra ? ' – ' + extra : ''}`); console.log(`✓ ${name}${extra ? ' – ' + extra : ''}`); };
+// v1.5: Übungs-Panel aufklappen (zweites Tippen würde zuklappen)
+const openEx = async ex => { if (!(await page.$(`.extile.open[data-exsel="${ex}"]`))) await page.click(`[data-exsel="${ex}"]`); await page.waitForSelector(`#xp-panel[data-panel="${ex}"]`); await page.waitForTimeout(300); };
 const shot = async name => { await page.waitForTimeout(450); await page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove())); await page.screenshot({ path: path.join(SCREENS, name) }); };
 const S = () => page.evaluate(() => { const s = __rz.session; return s && { status: s.status, phaseIdx: s.phaseIdx, round: s.round, setNo: s.setNo, restMs: s.restMs, target: s.target, total: s.sets.reduce((a, x) => a + x.done, 0), sets: s.sets.length, left: s.endsAt - Date.now() }; });
 const run = ms => page.clock.runFor(ms);
@@ -70,11 +72,11 @@ await page.evaluate(() => document.querySelector('.rechint').scrollIntoView({ bl
 await shot('24_hinweis_nach_test.png');
 // Countdown überlebt Neuladen (zeitstempelbasiert)
 await page.reload(); await page.waitForSelector('.extiles');
-const recHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exrec')?.textContent ?? null])));
+const recHome = await page.$$eval('.extiles .extile:not(.own)', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exrec.wait')?.textContent ?? null])));
 assert.match(recHome['Liegestütze'], /^Erholung noch (9:\d\d|10:00)$/); assert.match(recHome['Dips'], /^Erholung noch/); assert.equal(recHome['Kniebeugen'], null); assert.equal(recHome['Klimmzüge'], null);
 assert.doesNotMatch(await page.textContent('.extiles'), /erholt/);
-const statsHome = await page.$$eval('.extile', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exmax').textContent + ' | ' + x.querySelector('.exbest').textContent])));
-assert.equal(statsHome['Liegestütze'], 'Max am Stück 25 | Rekord 5 min –'); assert.equal(statsHome['Kniebeugen'], 'Test offen | Rekord 5 min –');
+const statsHome = await page.$$eval('.extiles .extile:not(.own)', e => Object.fromEntries(e.map(x => [x.querySelector('.exname').textContent, x.querySelector('.exmax').textContent + ' | ' + x.querySelector('.exbest').textContent])));
+assert.equal(statsHome['Liegestütze'], 'Max am Stück 25 | Rekord 5 min –'); assert.equal(statsHome['Kniebeugen'], 'Max am Stück Test offen | Rekord 5 min –');
 ok('Hinweis nach Test: 10 min Pause für Brust/Trizeps/Schulter, Countdown läuft, Tagesverteilung + Vortag-Tipp', cd2);
 await page.click('[data-exsel="Klimmzüge"]'); await page.waitForSelector('.howto'); // ungetestete Übung öffnet den Test
 // nächste Übung: Klimmzüge ohne Test per Zahl
@@ -87,8 +89,9 @@ assert.equal(await page.$$eval('.rechint', e => e.length), 0); // Eingabe ohne T
 await page.click('[data-act=assess-finish]'); await page.waitForSelector('.extiles');
 assert.equal(await page.evaluate(() => __rz.settings.setupDone), true);
 ok('Nächste Übung: Klimmzüge 8 per Eingabe → 3/25 s, 3/30 s, 2/30 s; Fertig → Startseite');
-await page.click('[data-exsel="Liegestütze"]');
-assert.match(await page.textContent('.maxbar'), /25.*Fitnesstest wiederholen/s);
+await openEx('Liegestütze');
+assert.match(await page.textContent('.maxbar'), /Fitnesstest.*Test wiederholen/s); assert.doesNotMatch(await page.textContent('.maxbar'), /25/); // Max steht nur auf der Kachel
+assert.equal(await page.textContent('.extile[data-exsel="Liegestütze"] .exmax'), 'Max am Stück 25');
 await page.waitForTimeout(500);
 await shot('07_start_nach_setup.png');
 await shot('25_start_erholungsstatus.png');
@@ -186,11 +189,11 @@ await page.click('[data-act=cancel-lead]');
 assert.equal(await page.evaluate(() => __rz.history.length), histLen);
 ok('Ergebnis: „Nächstes EDT ab hh:mm“, Wechsel auf andere Muskelgruppe startet ohne Warten', otherEx);
 await page.goto(base); await page.waitForSelector('.extiles');
-assert.match(await page.textContent('.extile:has-text("Liegestütze") .exrec'), /Erholung noch/);
+assert.match(await page.textContent('.extile:has-text("Liegestütze") .exrec.wait'), /Erholung noch/);
 assert.equal(await page.textContent('.extile:has-text("Liegestütze") .exbest'), `Rekord 5 min ${tot1}`); // nach erster 5-min-Einheit
 ok('Kachel nach 5-min-Einheit: „Rekord 5 min ' + tot1 + '“');
 await run(10 * 60000);
-await page.click('[data-exsel="Liegestütze"]');
+await openEx('Liegestütze');
 
 // 2. Einheit schneller → Bestwert, Neutest-Empfehlung, Vorschlag „später“
 await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await page.click('[data-act=plan-start]'); await page.waitForSelector('#t-lead'); await run(5100); await page.waitForSelector('[data-act=done]');
@@ -288,12 +291,12 @@ await ctx.setOffline(false);
     localStorage.setItem('repzeit.tunes', JSON.stringify({ 'Liegestütze': { max: 25, date: '2026-10-21T10:00:00.000Z', source: 'vorschlag', phases: [{ reps: 10, restSec: 15, rounds: 8 }, { reps: 10, restSec: 20, rounds: null }] } }));
     localStorage.setItem('repzeit.settings', JSON.stringify({ sound: false, exSel: 'Liegestütze', asked: ['Liegestütze'] }));
   });
-  await p2.reload(); await p2.waitForSelector('.maxbar');
+  await p2.reload(); await p2.waitForSelector('.extiles'); await p2.click('[data-exsel="Liegestütze"]'); await p2.waitForSelector('.maxbar');
   const m = await p2.evaluate(() => ({ maxes: JSON.parse(localStorage.getItem('edt.maxes')), hist: JSON.parse(localStorage.getItem('edt.history')), tunes: JSON.parse(localStorage.getItem('edt.tunes')), set: JSON.parse(localStorage.getItem('edt.settings')), mig: JSON.parse(localStorage.getItem('edt.migrated')), old: localStorage.getItem('repzeit.history'), w: __rz.workouts.find(w => w.id === 'tpl-liegestuetz-5') }));
   assert.equal(m.maxes['Liegestütze'][0].v, 25); assert.equal(m.hist[0].id, 'sMIG'); assert.equal(m.tunes['Liegestütze'].phases[0].rounds, 8);
   assert.equal(m.set.sound, false); assert.ok(m.mig && m.mig.keys.includes('history')); assert.ok(m.old);
   assert.equal(m.w.phases.length, 3); assert.equal(m.w.name, 'Liegestütz-EDT 5 min');
-  assert.match(await p2.textContent('.maxbar'), /25/);
+  assert.match(await p2.textContent('.extile[data-exsel="Liegestütze"] .exmax'), /25/);
   await p2.click('[data-go=history]'); await p2.waitForSelector('.hitem'); assert.match(await p2.textContent('.hlist'), /88/);
   await c2.close();
   ok('Migration repzeit.* → edt.*: Maximum, Verlauf, Anpassung, Einstellungen übernommen; Vorlage auf 3 Phasen');
@@ -311,7 +314,7 @@ await ctx.setOffline(false);
     localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, exSel: 'Liegestütze', asked: ['Liegestütze'], planVer: 2, sound: false, voice: false }));
   });
   await p3.reload(); await p3.waitForSelector('.extiles');
-  await p3.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await p3.click('[data-act=plan-start]'); await p3.waitForSelector('.recsheet');
+  await p3.click('[data-exsel="Liegestütze"]'); await p3.waitForSelector('#xp-panel'); await p3.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await p3.click('[data-act=plan-start]'); await p3.waitForSelector('.recsheet');
   assert.match(await p3.textContent('.cutnote'), /−16 % nur für diese Einheit \(10 → 8, 10 → 8, 8 → 7 Wdh\.\)/);
   await p3.click('[data-act=rec-force]'); await p3.waitForSelector('.srbadge');
   assert.match(await p3.textContent('.srbadge'), /Verkürzte Erholung · Sätze −16 %/);
