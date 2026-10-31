@@ -4,7 +4,7 @@ import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js';
 export const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 export const DAYS_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 const ICS_DAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
-export const emptyPlan = () => ({ entries: [], alarmBefore: 10, remind: false, removed: [], seq: 0, exportedSig: null, exportedAt: null });
+export const emptyPlan = () => ({ entries: [], alarmBefore: 10, remind: false, removed: [], exported: [], seq: 0, exportedSig: null, exportedAt: null });
 /** Wochentag 0 = Montag … 6 = Sonntag (lokale Zeit) */
 export const dayIdx = d => (d.getDay() + 6) % 7;
 const toMin = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + m; };
@@ -18,6 +18,7 @@ export function normalizePlan(p) {
     .map(e => ({ id: String(e.id || newId()), day: e.day, time: e.time, workoutId: String(e.workoutId) }));
   b.alarmBefore = [0, 5, 10, 15, 30, 60].includes(b.alarmBefore) ? b.alarmBefore : 10;
   b.removed = Array.isArray(b.removed) ? b.removed.filter(x => typeof x === 'string') : [];
+  b.exported = Array.isArray(b.exported) ? b.exported.filter(x => typeof x === 'string') : [];
   b.seq = Number.isInteger(b.seq) ? b.seq : 0;
   return b;
 }
