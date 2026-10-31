@@ -1,13 +1,13 @@
 {
   "name": "edt-timer",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "EDT Timer – PWA für Escalating Density Training mit Cluster-Sätzen",
   "scripts": {
     "icons": "node tools/icons.mjs",
     "build": "node tools/build.mjs",
-    "test": "node --test tests/engine.test.mjs",
+    "test": "node --test tests/engine.test.mjs tests/week.test.mjs",
     "test:e2e": "node tests/e2e.mjs",
     "serve": "python3 -m http.server 8790 -d dist"
   },

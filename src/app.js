@@ -1,6 +1,8 @@
 import * as E from './engine.js';
 import * as A from './audio.js';
 import { store, migrated } from './store.js';
+import { figureSvg, animateFigures } from './figures.js';
+import * as W from './week.js';
 
 const VERSION = '__VERSION__';
 const $ = (s, r = document) => r.querySelector(s);
@@ -15,7 +17,7 @@ const st = {
   view: 'home', workouts: store.workouts(), history: store.history(), settings: store.settings(),
   session: null, lead: null, draft: null, result: null, resultFrom: 'home', histFilter: null,
   adj: 0, layoutKey: '', sheet: null, partialVal: 0, installEvt: null, maxes: store.maxes(), assess: null,
-  tunes: store.tunes(), plan: null, tuneSel: 0,
+  tunes: store.tunes(), plan: null, tuneSel: 0, week: W.normalizePlan(store.plan()), wcopy: null,
 };
 window.__rz = st;
 
@@ -93,7 +95,7 @@ function recTick() {
     render();
   }
 }
-setInterval(recTick, 1000);
+setInterval(() => { recTick(); remindTick(); }, 1000);
 const dLong = iso => new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const dShort = iso => new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
@@ -105,7 +107,7 @@ function toast(msg) {
 const LOGO = `<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="var(--acc)"/><path d="M36 8 18 36h12l-4 20 20-30H34l2-18z" fill="#0b0d10"/></svg>`;
 
 function tabs(active) {
-  const t = [['home', 'Workouts', 'M4 10h3v4H4zM17 10h3v4h-3zM7 8h2v8H7zM15 8h2v8h-2zM9 11h6v2H9z'], ['history', 'Verlauf', 'M4 19h16v1.5H4zM6 16l4-5 3 3 5-7 1.2.9-6 8.3-3-3-3.3 4z'], ['more', 'Mehr', 'M5 11h3v3H5zM10.5 11h3v3h-3zM16 11h3v3h-3z']];
+  const t = [['home', 'Workouts', 'M4 10h3v4H4zM17 10h3v4h-3zM7 8h2v8H7zM15 8h2v8h-2zM9 11h6v2H9z'], ['week', 'Wochenplan', 'M7 3h1.6v2h6.8V3H17v2h2.5A1.5 1.5 0 0 1 21 6.5v13a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5v-13A1.5 1.5 0 0 1 4.5 5H7zM4.6 9.5v9.9h14.8V9.5zM7 12h3v3H7z'], ['history', 'Verlauf', 'M4 19h16v1.5H4zM6 16l4-5 3 3 5-7 1.2.9-6 8.3-3-3-3.3 4z'], ['more', 'Mehr', 'M5 11h3v3H5zM10.5 11h3v3h-3zM16 11h3v3h-3z']];
   return `<nav class="tabs">${t.map(([v, l, d]) => `<button class="tab ${active === v ? 'on' : ''}" data-go="${v}"><svg viewBox="0 0 24 24"><path d="${d}" fill="currentColor"/></svg><span>${l}</span></button>`).join('')}</nav>`;
 }
 
@@ -115,7 +117,7 @@ function viewHome() {
   const list = st.workouts.filter(w => own ? !E.EXERCISES.includes(w.exercise) : w.exercise === sel);
   const m = own ? null : maxOf(sel);
   const tiles = E.EXERCISES.map(ex => { const mx = maxOf(ex);
-    return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}"><span class="exname">${ex}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>` : 'Test offen'}</span>${recState(ex)}</button>`; }).join('');
+    return `<button class="extile ${ex === sel ? 'on' : ''}" data-exsel="${ex}">${figureSvg(ex, 'tilefig')}<span class="exname">${ex}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>` : 'Test offen'}</span>${recState(ex)}</button>`; }).join('');
   const cards = list.map(w => {
     const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
     const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
@@ -137,12 +139,128 @@ function viewHome() {
     : `<div class="askcard"><b>Fitnesstest ${esc(sel)}</b><p>Maximale saubere Wiederholungen bis zum Muskelversagen. Daraus entstehen Satzgröße, Pausen und 3 Phasen.</p><button class="btn primary wide" data-act="assess" data-aex="${sel}">Fitnesstest starten</button></div>`;
   return `<header class="top"><div class="brand">${LOGO}<span>EDT Timer</span></div><div class="ver">Escalating Density Training</div></header>
   <main class="scroll">
+    ${todayCard()}
     <div class="extiles">${tiles}</div>
     <button class="chip own ${own ? 'on' : ''}" data-exsel="__own">Eigene Übungen</button>
     ${maxBox}
     ${cards || `<p class="muted">Noch kein Workout für diese Auswahl.</p>`}
     <button class="btn add" data-act="new">+ Neues Workout</button>
   </main>${tabs('home')}`;
+}
+
+// ---------- Wochenplan ----------
+const winfo = id => { const w = workoutById(id); return w && { name: w.name, exercise: w.exercise, muscle: w.muscle, limitMin: w.limitMin }; };
+const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const ymdL = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+function saveWeek() { store.savePlan(st.week); }
+function weekStrip() {
+  const ws = W.weekStatus(st.week, st.history, new Date(now()), winfo);
+  return `<div class="wstrip">${ws.map(d => `<div class="wd ${d.today ? 'today' : ''} ${d.total && d.done >= d.total ? 'full' : d.past && d.total ? 'miss' : ''}"><b>${W.DAYS[d.day]}</b><small>${d.total ? `${d.done}/${d.total}` : '–'}</small></div>`).join('')}</div>`;
+}
+function todayCard() {
+  if (!st.week.entries.length) return `<button class="todaycard empty" data-go="week"><b>Wochenplan</b><span>Einheiten über die Woche und den Tag verteilen, mit Kalender-Erinnerung</span></button>`;
+  const d = new Date(now()), list = W.entriesOn(st.week, W.dayIdx(d)), done = W.doneOn(st.week, st.history, d, winfo), nx = W.nextToday(st.week, st.history, d, winfo);
+  const mins = d.getHours() * 60 + d.getMinutes();
+  const rows = list.map(e => { const i = winfo(e.workoutId); if (!i) return '';
+    const isDone = done.has(e.id), isNext = nx && nx.id === e.id, late = !isDone && toMin(e.time) + 30 < mins && !isNext;
+    return `<div class="trow ${isDone ? 'done' : isNext ? 'next' : late ? 'late' : ''}" data-eid="${e.id}">
+      <span class="tt">${e.time}</span>${figureSvg(i.exercise, 'rowfig')}
+      <span class="tex"><b>${esc(i.exercise)}</b><small>${esc(i.name)}</small></span>
+      <span class="tst">${isDone ? '<span class="ok">✓ erledigt</span>' : `${late ? '<small class="muted">verpasst</small>' : ''}${recState(i.exercise, i.muscle)}`}</span>
+      ${isDone ? '' : `<button class="btn ${isNext ? 'primary' : 'ghost'} sm" data-act="plan-go" data-wid="${e.workoutId}">Start</button>`}</div>`; }).join('');
+  return `<section class="panel today"><div class="panel-h"><span>Heute · ${W.DAYS_LONG[W.dayIdx(d)]}</span><button class="link" data-go="week">Wochenplan</button></div>
+    ${nx ? `<div class="tnext">Nächste Einheit: <b>${nx.time} ${esc(winfo(nx.workoutId)?.exercise || '')}</b></div>` : list.length ? `<div class="tnext ok">Alle Einheiten für heute erledigt.</div>` : `<div class="tnext">Heute nichts geplant.</div>`}
+    ${rows}${weekStrip()}</section>`;
+}
+function viewWeek() {
+  const conf = W.planConflicts(st.week, winfo, recCfg()), byId = Object.fromEntries(st.week.entries.map(e => [e.id, e]));
+  const opts = sel => st.workouts.map(w => `<option value="${w.id}" ${w.id === sel ? 'selected' : ''}>${esc(w.name)}</option>`).join('');
+  const changed = st.week.exportedSig && st.week.exportedSig !== W.planSig(st.week);
+  const days = W.DAYS_LONG.map((name, d) => {
+    const list = W.entriesOn(st.week, d), cf = conf.filter(c => c.day === d);
+    return `<div class="wday" data-day="${d}"><div class="wday-h"><b>${name}</b><span class="muted">${list.length ? `${list.length} ${list.length > 1 ? 'Einheiten' : 'Einheit'}` : 'frei'}</span>${list.length ? `<button class="link" data-act="wcopy" data-day="${d}">Kopieren</button>` : ''}</div>
+      ${list.map(e => { const i = winfo(e.workoutId), bad = cf.some(c => c.a === e.id || c.b === e.id);
+        return `<div class="wrow ${bad ? 'bad' : ''}" data-eid="${e.id}"><input type="time" class="wtime" value="${e.time}" aria-label="Uhrzeit">${i ? figureSvg(i.exercise, 'rowfig') : ''}<select class="wsel" aria-label="Workout">${opts(e.workoutId)}</select><button class="icon sm" data-act="wdel" aria-label="Eintrag löschen">✕</button></div>`; }).join('')}
+      ${cf.map(c => `<div class="wwarn">${byId[c.a].time} und ${byId[c.b].time}: beide ${esc(c.group)}, ${c.gapMin < 0 ? 'überschneiden sich' : `nur ${c.gapMin} min Pause`} (mind. ${c.needMin} min nach Ende der ersten Einheit)</div>`).join('')}
+      <button class="btn ghost sm addrow" data-act="wadd" data-day="${d}">+ Eintrag</button></div>`;
+  }).join('');
+  const N = 'Notification' in window ? Notification.permission : 'none';
+  return `<header class="top"><h2>Wochenplan</h2><span class="ver">${st.week.entries.length} Einträge</span></header>
+  <main class="scroll form week">
+    ${weekStrip()}
+    <div class="field"><span>Vorlagen</span><div class="chips">${Object.entries(W.PLAN_TEMPLATES).map(([k, t]) => `<button class="chip" data-act="wtpl" data-k="${k}">${t.name}</button>`).join('')}${st.week.entries.length ? '<button class="chip" data-act="wclear">Leeren</button>' : ''}</div>
+      <p class="tip">${W.TEMPLATE_SLOTS.map(([t, ex]) => `${t} ${ex}`).join(', ')}. Verschiedene Muskelgruppen über den Tag verteilen; gleiche Gruppe mit mindestens ${st.settings.recEdt} min Pause.</p></div>
+    ${conf.length ? `<div class="recbox wait">${conf.length} ${conf.length > 1 ? 'Einträge liegen' : 'Eintrag liegt'} zu dicht an derselben Muskelgruppe. Muskeln sind dann nicht erholt.</div>` : ''}
+    ${days}
+    <h3 class="h3">Erinnerungen</h3>
+    <div class="panel remind">
+      <p class="rmain">Für Erinnerungen bei geschlossener App: In den Kalender übernehmen.</p>
+      <div class="prow col"><span>Kalender-Erinnerung</span><div class="seg">${[0, 5, 10, 15, 30].map(v => `<button data-wab="${v}" class="${st.week.alarmBefore === v ? 'on' : ''}">${v ? `${v} min vorher` : 'zur Startzeit'}</button>`).join('')}</div></div>
+      <p class="muted sm">${st.week.alarmBefore ? `Zur Startzeit und ${st.week.alarmBefore} min vorher.` : 'Zur Startzeit.'} Wöchentlich wiederkehrend, Zeitzone Europe/Berlin, mit Link zur App.</p>
+      <button class="btn primary wide" data-act="ics" ${st.week.entries.length ? '' : 'disabled'}>In den Kalender übernehmen (.ics)</button>
+      ${changed ? `<div class="recbox wait">Plan seit dem Export am ${dShort(st.week.exportedAt)} geändert. Neu exportieren; gleiche Einträge werden im Kalender aktualisiert, sofern der Kalender das unterstützt.</div>` : st.week.exportedAt ? `<p class="muted sm">Exportiert am ${dShort(st.week.exportedAt)} ${hhmm(st.week.exportedAt)} Uhr.</p>` : ''}
+      <label class="toggle"><span>In-App-Erinnerung<small>Nur solange die App geöffnet ist oder im Hintergrund läuft: ${N === 'granted' ? 'Benachrichtigung, ' : ''}Ton und Sprache</small></span><input type="checkbox" class="switch" data-wset="remind" ${st.week.remind ? 'checked' : ''}></label>
+      ${st.week.remind && N === 'default' ? `<button class="btn ghost wide sm" data-act="notify-ask">Benachrichtigung erlauben</button>` : ''}
+      ${st.week.remind && N === 'denied' ? '<p class="muted sm">Benachrichtigungen sind im Browser blockiert. Erinnerung nur in der App.</p>' : ''}
+    </div>
+  </main>${tabs('week')}${weekSheet()}`;
+}
+function weekSheet() {
+  if (st.sheet !== 'wcopy' || !st.wcopy) return '';
+  const c = st.wcopy;
+  return `<div class="sheet-bg"><div class="sheet"><h3>${W.DAYS_LONG[c.from]} kopieren</h3><p>Einträge der Zieltage werden ersetzt.</p>
+    <div class="chips daypick">${W.DAYS.map((n, d) => d === c.from ? '' : `<button class="chip ${c.to.includes(d) ? 'on' : ''}" data-wto="${d}">${n}</button>`).join('')}</div>
+    <div class="chips"><button class="chip" data-act="wto-all">Alle Tage</button><button class="chip" data-act="wto-week">Mo–Fr</button></div>
+    <button class="btn primary wide big" data-act="wcopy-ok" ${c.to.length ? '' : 'disabled'}>Auf ${c.to.length} ${c.to.length === 1 ? 'Tag' : 'Tage'} kopieren</button>
+    <button class="btn ghost wide" data-act="wcopy-cancel">Abbrechen</button></div></div>`;
+}
+function weekAdd(day) {
+  const list = W.entriesOn(st.week, day), last = list.at(-1);
+  const time = last ? `${String(Math.min(21, Math.floor(toMin(last.time) / 60) + 4)).padStart(2, '0')}:00` : '08:00';
+  const used = list.map(e => winfo(e.workoutId)).filter(Boolean).map(i => E.musclesOf(i.exercise, i.muscle));
+  const w = st.workouts.find(x => !used.some(u => E.overlaps(u, E.musclesOf(x.exercise, x.muscle)))) || st.workouts[0];
+  if (!w) return;
+  st.week.entries.push({ id: W.newId(), day, time, workoutId: w.id }); saveWeek();
+}
+const resolveEx = ex => (st.workouts.find(w => w.exercise === ex && w.auto.enabled) || st.workouts.find(w => w.exercise === ex))?.id || null;
+async function exportIcs() {
+  st.week.seq = (st.week.seq || 0) + 1;
+  const ics = W.buildIcs(st.week, { info: winfo, url: new URL('./', location.href).href, now: new Date(now()) });
+  st.week.exportedSig = W.planSig(st.week); st.week.exportedAt = new Date(now()).toISOString(); st.week.removed = []; saveWeek();
+  const name = 'edt-wochenplan.ics', file = new File([ics], name, { type: 'text/calendar' });
+  window.__lastIcs = ics; // für Tests
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'EDT Wochenplan' }); render(); return; } }
+  catch (e) { if (e.name === 'AbortError') { render(); return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Kalenderdatei gespeichert. Öffnen, um die Termine zu übernehmen.'); render();
+}
+// In-App-Erinnerung (nur bei geöffneter App / im Hintergrund)
+function remindTick() {
+  if (!st.week.remind || !st.week.entries.length) return;
+  const d = new Date(now()), mins = d.getHours() * 60 + d.getMinutes(), done = W.doneOn(st.week, st.history, d, winfo);
+  const fired = st.settings.reminded || (st.settings.reminded = []);
+  for (const e of W.entriesOn(st.week, W.dayIdx(d))) {
+    if (done.has(e.id)) continue;
+    const t = toMin(e.time), i = winfo(e.workoutId); if (!i) continue;
+    for (const [kind, at] of [['pre', st.week.alarmBefore ? t - st.week.alarmBefore : null], ['now', t]]) {
+      if (at == null || mins < at || mins >= at + 3) continue;
+      const key = `${ymdL(d)}|${e.id}|${kind}`; if (fired.includes(key)) continue;
+      fired.push(key); if (fired.length > 60) fired.splice(0, fired.length - 60); store.saveSettings(st.settings);
+      const msg = kind === 'pre' ? `In ${st.week.alarmBefore} min: ${e.time} ${i.exercise}` : `Jetzt: ${i.exercise} (${i.name})`;
+      toast(msg); A.cue.alert(); A.say(kind === 'pre' ? `In ${st.week.alarmBefore} Minuten ${i.exercise}` : `Zeit für ${i.exercise}`);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const url = `./?w=${encodeURIComponent(e.workoutId)}`;
+        navigator.serviceWorker?.getRegistration?.().then(r => r ? r.showNotification('EDT Timer', { body: msg, tag: 'edt-' + e.id, data: { url } }) : new Notification('EDT Timer', { body: msg })).catch(() => {});
+      }
+      if (st.view === 'home') render();
+    }
+  }
+}
+function planGo(w) {
+  if (!w) return;
+  if (E.EXERCISES.includes(w.exercise) && !maxOf(w.exercise) && w.auto.enabled) return openAssess(w.exercise, 'start:' + w.id);
+  openPlan(w); planStart();
 }
 
 // ---------- Fitnesstest (Setup beim ersten Start, jederzeit wiederholbar) ----------
@@ -189,6 +307,7 @@ function viewAssess() {
     const prev = maxOf(a.ex);
     return `${assessTop('Fitnesstest')}
     <main class="scroll">
+      <div class="introfig">${figureSvg(a.ex, 'big')}</div>
       <h2 class="q">${esc(a.ex)}</h2>
       <ol class="howto">
         <li><b>So viele saubere Wiederholungen wie möglich bis zum Muskelversagen.</b> Ohne Absetzen, volle Bewegung.</li>
@@ -351,7 +470,7 @@ function viewPlan() {
   const dirty = !samePhases(P, st.plan.base);
   return `<header class="top"><button class="icon" data-go="home" aria-label="Zurück">‹</button><h2>Plan</h2><span class="ver">${w.limitMin} min</span></header>
   <main class="scroll form">
-    <div class="planhead"><b>${esc(w.name)}</b><span class="muted">${esc(w.exercise)} · Tempo ${sec(tempo.spr)}/Wdh. (${tempo.src}) + Pause</span></div>
+    <div class="planhead">${figureSvg(w.exercise, 'planfig')}<b>${esc(w.name)}</b><span class="muted">${esc(w.exercise)} · Tempo ${sec(tempo.spr)}/Wdh. (${tempo.src}) + Pause</span></div>
     ${planOrigin(w)}
     ${planRec(w)}
     ${timelineBar(tl, w.limitMin * 60000)}
@@ -748,9 +867,10 @@ function viewMore() {
 
 // ---------- Render & Navigation ----------
 function render() {
-  const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess, plan: viewPlan }[st.view];
+  const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess, plan: viewPlan, week: viewWeek }[st.view];
   const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0;
   app.innerHTML = v(); app.dataset.view = st.view;
+  animateFigures(app);
   if (keep && st.view === st._lastView && $('.scroll')) $('.scroll').scrollTop = keep;
   st._lastView = st.view;
 }
@@ -794,6 +914,8 @@ app.addEventListener('click', e => {
   if (d.pst) { planStep(d.pst, +d.i, +d.d); return render(); }
   if (d.rate) { E.rateLastSet(s, d.rate); store.saveActive(s); A.cue.tap(); return render(); }
   if (d.tsel != null) { st.tuneSel = +d.tsel; return render(); }
+  if (d.wab != null) { st.week.alarmBefore = +d.wab; saveWeek(); return render(); }
+  if (d.wto != null) { const k = +d.wto, t = st.wcopy.to; st.wcopy.to = t.includes(k) ? t.filter(x => x !== k) : [...t, k]; return render(); }
   if (d.rec) { st.settings[d.rec] = Math.max(0, Math.min(60, (st.settings[d.rec] ?? 10) + +d.d)); store.saveSettings(st.settings); return render(); }
   const card = b.closest('.card'), w = card && workoutById(card.dataset.id);
   switch (d.act) {
@@ -801,6 +923,17 @@ app.addEventListener('click', e => {
       if (E.EXERCISES.includes(w.exercise) && !maxOf(w.exercise) && w.auto.enabled) return openAssess(w.exercise, 'start:' + w.id);
       return openPlan(w);
     case 'plan-start': return planStart();
+    case 'plan-go': return planGo(workoutById(d.wid));
+    case 'wadd': weekAdd(+d.day); return render();
+    case 'wdel': { const id = b.closest('[data-eid]').dataset.eid; st.week.entries = st.week.entries.filter(e => e.id !== id); st.week.removed.push(id); saveWeek(); return render(); }
+    case 'wtpl': st.week = W.applyTemplate(st.week, d.k, resolveEx); saveWeek(); toast(`Vorlage „${W.PLAN_TEMPLATES[d.k].name}“ übernommen`); return render();
+    case 'wclear': st.week.removed.push(...st.week.entries.map(e => e.id)); st.week.entries = []; saveWeek(); return render();
+    case 'wcopy': st.wcopy = { from: +d.day, to: [] }; st.sheet = 'wcopy'; return render();
+    case 'wto-all': st.wcopy.to = [0, 1, 2, 3, 4, 5, 6].filter(x => x !== st.wcopy.from); return render();
+    case 'wto-week': st.wcopy.to = [0, 1, 2, 3, 4].filter(x => x !== st.wcopy.from); return render();
+    case 'wcopy-ok': st.week = W.copyDay(st.week, st.wcopy.from, st.wcopy.to); saveWeek(); toast(`${W.DAYS_LONG[st.wcopy.from]} auf ${st.wcopy.to.length} ${st.wcopy.to.length === 1 ? 'Tag' : 'Tage'} kopiert`); st.sheet = null; st.wcopy = null; return render();
+    case 'wcopy-cancel': st.sheet = null; st.wcopy = null; return render();
+    case 'ics': return exportIcs();
     case 'rec-wait': st.sheet = null; st.plan.waiting = true; return render();
     case 'rec-force': return planStart(true);
     case 'rec-other': { const w2 = workoutById(d.wid); return w2 ? openPlan(w2) : undefined; }
@@ -835,7 +968,9 @@ app.addEventListener('click', e => {
     case 'addphase': { if (st.draft.phases.length >= E.MAX_PHASES) return; manualPhases(); const last = st.draft.phases.at(-1); st.draft.phases.at(-1).rounds = 5; st.draft.phases.push({ reps: last.reps, restSec: last.restSec + 5, rounds: null }); return render(); }
     case 'delphase': manualPhases(); st.draft.phases.splice(+d.i, 1); st.draft.phases.at(-1).rounds = null; return render();
     case 'dup': { const c = E.normalizeWorkout({ ...structuredClone(st.draft), id: uid('w'), name: st.draft.name + ' (Kopie)' }); st.workouts.push(c); store.saveWorkouts(st.workouts); toast('Kopie angelegt'); return go('home'); }
-    case 'delw': if (confirm('Workout löschen? Der Verlauf bleibt erhalten.')) { st.workouts = st.workouts.filter(x => x.id !== st.draft.id); store.saveWorkouts(st.workouts); go('home'); } return;
+    case 'delw': if (confirm('Workout löschen? Der Verlauf bleibt erhalten.')) { st.workouts = st.workouts.filter(x => x.id !== st.draft.id); store.saveWorkouts(st.workouts);
+      const gone = st.week.entries.filter(e => e.workoutId === st.draft.id).map(e => e.id); if (gone.length) { st.week.entries = st.week.entries.filter(e => !gone.includes(e.id)); st.week.removed.push(...gone); saveWeek(); }
+      go('home'); } return;
     // Training
     case 'cancel-lead': st.lead = null; A.keepAwake(false); return go('home');
     case 'minus': st.adj = Math.max(0, st.adj - 1); A.cue.tap(); return frame(), render();
@@ -865,7 +1000,7 @@ app.addEventListener('click', e => {
     }
     case 'import': return $('#f-import').click();
     case 'templates': st.workouts = store.restoreTemplates(); return toast('Vorlagen wiederhergestellt');
-    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); applySettings(); toast('Gelöscht'); render(); } return;
+    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
     case 'install': st.installEvt?.prompt(); st.installEvt = null; return render();
   }
 });
@@ -879,9 +1014,15 @@ app.addEventListener('change', async e => {
   const t = e.target;
   if (t.id === 'f-auto') { st.draft.auto.enabled = t.checked; reauto(); return render(); }
   if (t.id === 'f-adapt') { st.draft.adapt.enabled = t.checked; return render(); }
+  if (t.classList.contains('wtime') || t.classList.contains('wsel')) {
+    const e = st.week.entries.find(x => x.id === t.closest('[data-eid]').dataset.eid); if (!e) return;
+    if (t.classList.contains('wtime')) { if (!W.validTime(t.value)) return render(); e.time = t.value; } else e.workoutId = t.value;
+    saveWeek(); return render();
+  }
+  if (t.dataset.wset) { st.week[t.dataset.wset] = t.checked; saveWeek(); return render(); }
   if (t.dataset.set) { st.settings[t.dataset.set] = t.checked; store.saveSettings(st.settings); applySettings(); if (t.dataset.set === 'recNotify') render(); return; }
   if (t.id === 'f-import' && t.files[0]) {
-    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); applySettings();
+    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); st.week = W.normalizePlan(store.plan()); applySettings();
       toast(`Importiert: ${r.workouts} Workouts, ${r.sessions} Einheiten`); render(); }
     catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
   }
@@ -904,6 +1045,13 @@ const needSetup = () => !st.settings.setupDone && !Object.values(st.maxes).some(
 // Laufendes Training nach Neuladen fortsetzen
 const active = store.active();
 if (active && active.status !== 'done' && now() < active.endsAt + 30 * 60000) { st.session = active; st.adj = active.target; if (active.status === 'partial') { st.sheet = 'partial'; st.partialVal = active.target; } go('train'); A.keepAwake(true); }
-else { store.saveActive(null); if (needSetup()) openAssess(null, 'home', { setup: true }); else render(); }
+else {
+  store.saveActive(null);
+  const dl = new URLSearchParams(location.search).get('w'); // Link aus Kalender/Benachrichtigung
+  if (dl) history.replaceState(null, '', location.pathname);
+  if (needSetup()) openAssess(null, 'home', { setup: true });
+  else if (dl && workoutById(dl)) openPlan(workoutById(dl));
+  else render();
+}
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});

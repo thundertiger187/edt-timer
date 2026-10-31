@@ -290,3 +290,54 @@ input[type=range]{flex:1;accent-color:var(--acc);height:36px}
 .nextrec .freebtn{border-color:rgba(198,255,61,.45);color:var(--acc)}
 .recpanel .tip{margin-top:10px}
 .chip .cd{color:var(--warn)}
+
+/* v1.4 Strichmännchen */
+.fig{display:block;color:var(--acc);overflow:visible}
+.fig .eq{stroke:var(--mut);stroke-width:2.2;stroke-linecap:round;fill:none;opacity:.8}
+.fig .fbody polyline{fill:none;stroke:currentColor;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}
+.fig .fbody circle{fill:currentColor}
+.fig .fbody.ghost{opacity:.3}
+.fig .fbody.neutral rect{fill:none;stroke:currentColor;stroke-width:3.2}
+.extile{position:relative}
+.extile .tilefig{position:absolute;right:8px;bottom:8px;width:62px;height:52px;color:var(--mut);opacity:.9}
+.extile.on .tilefig{color:var(--acc)}
+.introfig{display:flex;justify-content:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin:0 0 12px}
+.introfig .fig{width:200px;height:166px}
+.planhead{position:relative;padding-right:76px;min-height:60px}
+.planhead .planfig{position:absolute;right:0;top:-4px;width:70px;height:58px}
+@media (prefers-color-scheme: light){.fig .eq{stroke:#5b6572}}
+
+/* v1.4 Wochenplan / Heute */
+.todaycard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:14px 16px;margin:0 0 14px;color:var(--tx)}
+.todaycard span{color:var(--mut);font-size:14px}
+.panel.today{margin-bottom:14px}
+.panel-h .link{color:var(--acc);font-weight:700;padding:0}
+.tnext{font-size:15px;margin:2px 0 10px}.tnext b{color:var(--acc)}.tnext.ok{color:var(--acc)}
+.trow{display:grid;grid-template-columns:46px 34px 1fr auto auto;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.trow .tt{font-weight:800;font-variant-numeric:tabular-nums}
+.trow .tex{display:flex;flex-direction:column;min-width:0}.trow .tex small{color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .tst{display:flex;flex-direction:column;align-items:flex-end;font-size:12.5px}
+.trow .tst .exrec{margin:0}.trow .ok{color:var(--acc);font-weight:700}
+.trow.done{opacity:.6}.trow.done .tt{text-decoration:line-through}
+.trow.next{background:linear-gradient(90deg,rgba(198,255,61,.1),transparent);border-radius:12px;padding-left:6px;margin:0 -6px;border-top-color:transparent}
+.rowfig{width:34px;height:28px;color:var(--mut)}.trow.next .rowfig{color:var(--acc)}
+.wstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.week .wstrip{margin:0 0 14px}
+.wd{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:6px 0;display:flex;flex-direction:column;align-items:center;font-size:12px}
+.wd b{font-size:12px}.wd small{color:var(--mut);font-variant-numeric:tabular-nums}
+.wd.today{border-color:var(--acc)}.wd.full{background:rgba(198,255,61,.14)}.wd.full small{color:var(--acc)}.wd.miss small{color:var(--warn)}
+.wday{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:10px}
+.wday-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}.wday-h b{font-size:16px}.wday-h .muted{flex:1;font-size:13px}
+.wday-h .link{color:var(--acc);font-weight:700}
+.wrow{display:grid;grid-template-columns:118px 28px 1fr 40px;align-items:center;gap:6px;margin-bottom:6px}
+.wrow input[type=time],.wrow select{background:var(--bg2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:9px 8px;font:inherit;font-size:15px;min-width:0;width:100%}
+.wrow.bad input,.wrow.bad select{border-color:var(--warn)}
+.wrow .rowfig{width:30px;height:26px}
+.icon.sm{width:40px;height:40px;font-size:16px}
+.wwarn{color:#ffd9a0;font-size:13px;background:rgba(255,176,59,.08);border:1px solid rgba(255,176,59,.4);border-radius:10px;padding:8px 10px;margin:4px 0 8px}
+.addrow{margin-top:2px}
+.remind .rmain{font-weight:700;margin:0 0 10px}
+.prow.col{flex-direction:column;align-items:stretch;gap:6px}
+.remind .seg button{font-size:13px;padding:8px 4px}
+.muted.sm{font-size:13px;margin:6px 0 10px}
+.daypick{margin-bottom:8px}

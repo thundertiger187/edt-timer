@@ -61,6 +61,19 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Wochenplan und Erinnerungen (v1.4.0)
+
+- **Tab „Wochenplan“:** pro Wochentag beliebig viele Einträge (Uhrzeit + Workout). Vorlagen: „Täglich 3×“ (08:00 Liegestütze, 13:00 Kniebeugen, 19:00 Klimmzüge) und „Mo/Mi/Fr 3×“. „Kopieren“ übernimmt einen Tag auf andere Tage (Zieltage werden ersetzt).
+- **Abstandsprüfung:** Einträge am selben Tag mit gleicher oder überlappender Muskelgruppe brauchen nach dem Ende der ersten Einheit mindestens „Pause zwischen EDTs“ (Standard 10 min, unter Mehr → Erholung). Beispiel: 08:00 Liegestütz-EDT 5 min und 08:10 Dips → „nur 5 min Pause“.
+- **Startseite „Heute“:** Einträge des Tages mit Erholungsstatus, nächste Einheit hervorgehoben, „Start“ öffnet den Plan und startet sofort (bei laufender Erholung erscheint der Warndialog). Erledigte Einträge werden automatisch abgehakt: eine gespeicherte Einheit desselben Workouts (oder derselben Übung) am selben Tag zählt für den frühesten noch offenen Eintrag. Darunter die Woche Mo–So mit erledigt/geplant.
+- **Kalender (.ics):** „In den Kalender übernehmen“ teilt die Datei (Web Share) oder lädt `edt-wochenplan.ics` herunter. Pro Eintrag ein wöchentlich wiederkehrender Termin (`RRULE:FREQ=WEEKLY;BYDAY=…`) in `TZID=Europe/Berlin` (mit VTIMEZONE), Dauer = Zeitlimit + 5 min, Erinnerung zur Startzeit und optional 5/10/15/30 min vorher, Link `…/edt-timer/?w=<Workout>` öffnet direkt den Plan. Jeder Eintrag behält seine UID (`edt-<id>@edt-timer`), der Export zählt `SEQUENCE` hoch: erneuter Import aktualisiert die Termine statt sie zu verdoppeln; gelöschte Einträge werden als `STATUS:CANCELLED` mitgeschickt. Nach Änderungen zeigt die App „Neu exportieren“.
+- **In-App-Erinnerung** (abschaltbar): Toast, Ton und Ansage zur Startzeit und X min vorher; mit Erlaubnis zusätzlich System-Benachrichtigung über den Service Worker (Erlaubnis wird erst beim Tippen angefragt). Funktioniert nur, solange die App offen ist oder im Hintergrund läuft – ohne Server gibt es keinen Push. Für Erinnerungen bei geschlossener App: In den Kalender übernehmen.
+- Der Wochenplan ist im JSON-Export/Import enthalten (`plan`).
+
+## Strichmännchen (v1.4.0)
+
+Animierte SVG-Figuren für Liegestütze, Kniebeugen, Dips (Barren/Stühle) und Klimmzüge (Stange) in den Übungskacheln, groß im Fitnesstest-Anleitungsscreen und klein im Plan und im Wochenplan. Pose aus Gelenkwinkeln mit festen Segmentlängen (Oberarm, Unterarm, Oberschenkel, Unterschenkel, Rumpf), Arme über Zwei-Gelenk-IK an Boden/Barren/Stange fixiert; eine Wiederholung ≈ 2 s (ab- und aufwärts, Kosinus-Verlauf), Endlosschleife per `requestAnimationFrame`, läuft nur, solange Figuren angezeigt werden (im Hintergrund pausiert der Browser sie). Bei `prefers-reduced-motion: reduce` statisch: Startposition blass, Endposition kräftig. Eigene Übungen: neutrales Hantel-Icon. Frames: `screens/fig_<übung>_start.png` / `_ende.png`.
+
 ## Erholung je Muskelgruppe (v1.3.0)
 
 Das Maximum aus dem Fitnesstest gilt für **erholte** Muskeln. Direkt nach einem Satz bis zum Muskelversagen sind die beteiligten Muskeln ermüdet; ein EDT mit Satzgrößen aus dem Maximum würde dann zu früh scheitern.
@@ -99,12 +112,16 @@ Vanilla JS (ES-Module), keine Abhängigkeiten zur Laufzeit. `src/` → `node too
 
 - `src/engine.js` – reine Ablauf-Logik (Phasen, Sätze, Zeitende, Auto-Anpassung, Fitnesstest-Plan), ohne DOM
 - `src/app.js` – Oberfläche, `src/audio.js` – Ton/Sprache/Vibration/Wake Lock, `src/store.js` – Speicherung
-- `src/sw.js` – Offline-Cache
+- `src/week.js` – Wochenplan, Abstandsprüfung, Kalender-Export (.ics), ohne DOM
+- `src/figures.js` – Strichmännchen (SVG, Gelenk-Keyframes, eigene Animation ohne Bibliothek)
+- `src/sw.js` – Offline-Cache, Klick auf Benachrichtigung öffnet die App
 
 ```
 npm run build        # dist/ bauen
 npm test             # Unit-Tests (node:test)
-npm run test:e2e     # E2E (Playwright, Fake-Clock); optional URL: node tests/e2e.mjs x run icons        # PNG-Icons aus icon.svg erzeugen
+npm run test:e2e     # E2E (Playwright, Fake-Clock); optional URL: node tests/e2e.mjs <URL>
+node tests/e2e-week.mjs [URL]   # E2E Wochenplan, Kalender, Erinnerung, Strichmännchen
+npm run icons        # PNG-Icons aus icon.svg erzeugen
 ```
 
 Deployment: Inhalt von `dist/` im Branch `gh-pages` (GitHub Pages).
