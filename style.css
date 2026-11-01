@@ -491,9 +491,8 @@ html:not([data-motion=full]) .devc .wl.draw{stroke-dasharray:none;stroke-dashoff
 #app{z-index:1}
 /* 1. Leuchtpunkt */
 .fx-layer{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden}
-.fx-glow{position:fixed;overflow:hidden;pointer-events:none;contain:strict}
-.fx-glow::after{content:"";position:absolute;left:calc(var(--gx) - var(--gs));top:calc(var(--gy) - var(--gs));width:calc(var(--gs) * 2);height:calc(var(--gs) * 2);border-radius:50%;
-  background:radial-gradient(circle,var(--gc) 0,var(--gc) 8%,transparent 66%);opacity:0;transform:scale(.35);animation:fxglow .6s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
+.fx-glow{position:fixed;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,var(--gc) 0,var(--gc) 14%,transparent 70%);opacity:0;transform:scale(.3);animation:fxglow .5s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
 .fx-glow.cyan{--gc:rgba(56,217,255,.46)}
 .fx-glow.green{--gc:rgba(198,255,61,.50)}
 .fx-glow.green.filled{--gc:rgba(255,255,255,.72)}
@@ -540,7 +539,7 @@ html:not([data-motion=full]) .devc .wl.draw{stroke-dasharray:none;stroke-dashoff
 @keyframes fxbreath{0%{opacity:.55}100%{opacity:1}}
 html[data-motion=gentle] .card,html[data-motion=gentle] .phase,html[data-motion=gentle] .st-work .work,html[data-motion=gentle] .st-rest .rest,html[data-motion=gentle] .badge.big,html[data-motion=gentle] .sheet{animation-name:fxo!important}
 html[data-motion=gentle] .leadnum{animation:none}
-html[data-motion=gentle] .fx-glow::after{animation-name:fxglowfade;transform:none}
+html[data-motion=gentle] .fx-glow{animation-name:fxglowfade;transform:none}
 html[data-motion=gentle] .hero.flash::before{animation-name:fxflashfade;transform:none}
 html[data-motion=gentle] .rv{transform:none}
 html[data-motion=gentle] .fxl i{animation-name:fxbreath!important;transform:none}

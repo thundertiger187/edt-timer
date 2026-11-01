@@ -1,11 +1,11 @@
-import * as E from './engine.js?v=ca63cfe1';
-import * as A from './audio.js?v=ca63cfe1';
-import { store, migrated } from './store.js?v=ca63cfe1';
-import { figureSvg, animateFigures } from './figures.js?v=ca63cfe1';
-import * as W from './week.js?v=ca63cfe1';
-import * as FX from './fx.js?v=ca63cfe1';
+import * as E from './engine.js?v=12001cb6';
+import * as A from './audio.js?v=12001cb6';
+import { store, migrated } from './store.js?v=12001cb6';
+import { figureSvg, animateFigures } from './figures.js?v=12001cb6';
+import * as W from './week.js?v=12001cb6';
+import * as FX from './fx.js?v=12001cb6';
 
-const VERSION = '1.6.1-ca63cfe1';
+const VERSION = '1.6.2-12001cb6';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -24,20 +24,35 @@ function glowLayer() {
   return layer;
 }
 export function initGlow() {
-  // passiv: blockiert weder Tippen noch Scrollen; Overlay außerhalb von #app übersteht ein Neuzeichnen
+  // 1.6.2: punktueller Leuchtpunkt an der Tippstelle (keine Kachelform mehr). Startet erst nach kurzer
+  // Verzögerung und nur, wenn der Finger nicht scrollt; beim Scrollen verschwinden laufende Punkte sofort.
+  let pend = null;
+  const cancel = () => { if (pend) { clearTimeout(pend.timer); pend = null; } };
+  const clearAll = () => { cancel(); layer?.replaceChildren(); };
   document.addEventListener('pointerdown', e => {
+    cancel();
     if (mode() === 'off' || e.button > 0) return;
     const t = e.target.closest?.(GLOW_SEL); if (!t || t.disabled) return;
-    const r = t.getBoundingClientRect(); if (!r.width || !r.height) return;
-    const g = document.createElement('span');
     const green = t.matches(GREEN_SEL), filled = green && !t.matches('[data-act=plan-go].st');
-    g.className = 'fx-glow ' + (green ? (filled ? 'green filled' : 'green') : 'cyan');
-    const rad = getComputedStyle(t).borderRadius;
-    g.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border-radius:${rad};--gx:${e.clientX - r.left}px;--gy:${e.clientY - r.top}px;--gs:${Math.max(r.width, r.height) * 1.25}px`;
-    glowLayer().appendChild(g);
-    const done = () => g.remove();
-    g.addEventListener('animationend', done, { once: true }); setTimeout(done, 1000);
+    const x = e.clientX, y = e.clientY;
+    const show = () => {
+      pend = null;
+      const g = document.createElement('span');
+      g.className = 'fx-glow ' + (green ? (filled ? 'green filled' : 'green') : 'cyan');
+      g.style.cssText = `left:${x}px;top:${y}px`;
+      glowLayer().appendChild(g);
+      const done = () => g.remove();
+      g.addEventListener('animationend', done, { once: true }); setTimeout(done, 900);
+    };
+    if (e.pointerType === 'touch') pend = { x, y, show, timer: setTimeout(show, 70) };
+    else show();
   }, { passive: true, capture: true });
+  document.addEventListener('pointermove', e => {
+    if (pend && Math.hypot(e.clientX - pend.x, e.clientY - pend.y) > 8) cancel();
+  }, { passive: true, capture: true });
+  document.addEventListener('pointerup', () => { if (pend) { clearTimeout(pend.timer); pend.show(); } }, { passive: true, capture: true });
+  document.addEventListener('pointercancel', clearAll, { passive: true, capture: true });
+  addEventListener('scroll', clearAll, { passive: true, capture: true });
 }
 
 // ---------- 2. Ziffern-Effekt ----------
