@@ -1,8 +1,8 @@
-2026-10-31T22:35:53.190Z http://127.0.0.1:18739/
+2026-11-01T21:11:48.274Z http://127.0.0.1:18739/
 ✓ Startseite: Hintergrund „home“ (fxa, 20–40 s), oben sichtbar ≤ 300 ms, Karten unten blenden beim Scrollen ein – 30s, 4 Elemente unten
-✓ Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,6 s, Panel öffnet – --gx 40px
-✓ Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt – --gx 60px --gy 50px
-✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 554, Folge 966 966 444 894 574 868 675 157 156 189 125 125
+✓ Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,5 s punktuell, Panel öffnet – --gx 241px
+✓ Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt – --gx 76px --gy 602.438px
+✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 547, Folge 599 665 979 749 578 674 586 158 198 186 125 124
 ✓ Verlauf: Panels/Einträge mit Einblendung, oben sofort sichtbar
 ✓ Seite verborgen → Hintergrund pausiert, danach weiter
 ✓ Timer: Hintergrund „work“ im Satz, „rest“ in der Pause (Überblendung 1,2 s), Uhr läuft genau – 8:00 → 7:49 nach 10 s
@@ -11,7 +11,6 @@
 ✓ Automatisch + System reduziert: sanfte Stufe – Glow nur Überblendung, Einblenden ohne Versatz, Hintergrund atmet statt zu wandern, Figuren statisch, Ziffern-Effekt läuft
 ✓ Automatisch ohne Systemvorgabe: volle Effekte
 ✓ Aus: kein Glow, keine Einblendung, kein Ziffern-Effekt/Leuchten, Hintergrund statisch (animation none)
-✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.6.1-ca63cfe1
+✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.6.2-12001cb6
 ✓ Kontrast über die ganze Hintergrund-Schleife ≥ 4,5:1 für grauen Text – home: hellster Punkt rgb(42,54,22) → grau 4.67:1, weiß 11.71:1 | work: hellster Punkt rgb(43,54,22) → grau 4.66:1, weiß 11.68:1 | rest: hellster Punkt rgb(19,52,62) → grau 4.81:1, weiß 12.07:1
 ✓ Ohne IntersectionObserver: nichts versteckt, alle Karten sichtbar – 10 Elemente
-✓ Demo-Video – screens/1.6.1_demo.mp4

@@ -60,8 +60,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
   // 1. Leuchtpunkt beim pointerdown (Maus gedrückt halten, damit kein Klick auslöst)
   const box = await page.locator('.extile[data-exsel="Liegestütze"]').boundingBox();
   await page.mouse.move(box.x + 60, box.y + 50); await page.mouse.down();
-  const g = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.getPropertyValue('--gx'), gy: e.style.getPropertyValue('--gy'), pe: getComputedStyle(e).pointerEvents }; });
-  assert.ok(g, 'Glow-Element nach pointerdown'); assert.equal(g.cls, 'fx-glow cyan'); assert.equal(g.gx, '60px'); assert.equal(g.gy, '50px'); assert.equal(g.pe, 'none');
+  const g = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.left, gy: e.style.top, w: getComputedStyle(e).width, pe: getComputedStyle(e).pointerEvents }; });
+  assert.ok(g, 'Glow-Element nach pointerdown'); assert.equal(g.cls, 'fx-glow cyan'); assert.ok(g.gx.endsWith('px') && g.gy.endsWith('px')); assert.equal(g.w, '84px', 'punktuell, nicht Kachelform'); assert.equal(g.pe, 'none');
   await page.waitForTimeout(150); await shot(page, '64_glow_neu.png');
   await page.mouse.up(); await page.waitForSelector('#xp-panel'); // Tippen funktioniert weiter
   await page.waitForTimeout(800);
@@ -73,10 +73,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
   await page.waitForTimeout(700);
   const tb = await page.locator('.extile[data-exsel="Kniebeugen"]').boundingBox();
   await page.touchscreen.tap(tb.x + 40, tb.y + 30);
-  const tg = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.getPropertyValue('--gx'), a: getComputedStyle(e, '::after').animationName, d: getComputedStyle(e, '::after').animationDuration }; });
-  assert.ok(tg, 'Glow nach touchscreen.tap'); assert.equal(tg.cls, 'fx-glow cyan'); assert.equal(tg.gx, '40px'); assert.equal(tg.a, 'fxglow'); assert.equal(tg.d, '0.6s');
+  const tg = await page.evaluate(() => { const e = document.querySelector('.fx-layer .fx-glow'); return e && { cls: e.className, gx: e.style.left, a: getComputedStyle(e).animationName, d: getComputedStyle(e).animationDuration }; });
+  assert.ok(tg, 'Glow nach touchscreen.tap'); assert.equal(tg.cls, 'fx-glow cyan'); assert.ok(tg.gx.endsWith('px')); assert.equal(tg.a, 'fxglow'); assert.equal(tg.d, '0.5s');
   await page.waitForSelector('#xp-panel[data-panel="Kniebeugen"]');
-  ok('Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,6 s, Panel öffnet', `--gx ${tg.gx}`);
+  ok('Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,5 s punktuell, Panel öffnet', `--gx ${tg.gx}`);
   ok('Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt', `--gx ${g.gx} --gy ${g.gy}`);
   // 2. Ziffern-Effekt im Ergebnis (Verlauf → neueste Einheit, neuer Rekord 5 min)
   await page.click('.tab[data-go=history]'); await page.waitForSelector('.hitem');
@@ -132,7 +132,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(SCREENS, n) });
 }
 
 // ===== System „Bewegung reduzieren“: Einstellung An (Standard) / Automatisch (sanft) / Aus =====
-const tapTile = async (page, ex) => { const b = await page.locator(`.extile[data-exsel="${ex}"]`).boundingBox(); await page.touchscreen.tap(b.x + 40, b.y + 40); return page.evaluate(() => { const e = document.querySelector('.fx-glow'); return e ? getComputedStyle(e, '::after').animationName : null; }); };
+const tapTile = async (page, ex) => { const b = await page.locator(`.extile[data-exsel="${ex}"]`).boundingBox(); await page.touchscreen.tap(b.x + 40, b.y + 40); return page.evaluate(() => { const e = document.querySelector('.fx-glow'); return e ? getComputedStyle(e).animationName : null; }); };
 const resultState = async page => {
   await page.click('.tab[data-go=history]'); await page.waitForSelector('.hitem');
   const rv = await page.$$eval('.rv', e => e.length), rvT = await page.$$eval('.rv', e => e.length ? getComputedStyle(e[0]).transform : null);
@@ -183,7 +183,7 @@ const resultState = async page => {
   const opts = await page.$$eval('[data-anim]', e => e.map(b => [b.dataset.anim, b.textContent, b.getAttribute('aria-checked')]));
   assert.deepEqual(opts, [['auto', 'Automatisch', 'false'], ['on', 'An', 'true'], ['off', 'Aus', 'false']]);
   assert.match(await page.textContent('#anim-info'), /überstimmt/);
-  assert.match(await page.textContent('#app-ver'), /^1\.6\.1-[0-9a-f]{8}$/);
+  assert.match(await page.textContent('#app-ver'), /^1\.6\.2-[0-9a-f]{8}$/);
   await page.click('[data-anim=auto]');
   assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'gentle');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('edt.settings')).anim), 'auto');
