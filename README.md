@@ -61,6 +61,22 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Kombi-Training und Diagramm Regulär/Kombi/Gesamt (v1.7.0)
+
+- **Wo:** Startseite „Training“, Abschnitt **Kombi** direkt unter „Übungen“. Ohne Kombi steht dort ein leerer Zustand mit „Kombi anlegen“, sonst eine Karte je Kombi (Schritte, Dauer, Bestwert, Erholung) mit „Bearbeiten“ und „Start“ sowie „+ Kombi“ in der Überschrift.
+- **Anlegen/Bearbeiten:** Bottom-Sheet wie die übrigen Editoren, keine neue Seite. Name, 2–4 Schritte in fester Reihenfolge (Übung als Chip, Wiederholungen, Pause danach in Sekunden, ↑ zum Verschieben, ✕ zum Löschen, „+ Schritt“), Dauer als Chip 5/10/15/20 min oder „Ohne Limit“ mit Rundenzahl. Darunter eine Schätzung (Dauer einer Runde, Runden bzw. Gesamtdauer). Gespeichert in `localStorage` unter `edt.combos`, enthalten in Export/Import.
+- **Vorgabe:** Wiederholungen = 40 % des Fitnesstest-Max (`edt.maxes`), gerundet, mindestens 1, ohne Test 5. Eine neue Kombi startet als „Push & Pull“ (Liegestütze + Klimmzüge, 20 s Pause, 10 min). Es gibt keine gespeicherte Vorlage, weil Kombis nicht im Vorlagen-Speicher der Workouts liegen.
+- **Training:** derselbe Timer und dieselbe Engine (Vorlauf, „Satz geschafft“, Pausenring, Überspringen, Abbrechen, Teil-Satz bei Zeitende, Ergebnis). Die aktuelle Übung steht groß („12 Liegestütze“), darunter der nächste Schritt. In der Pause steht „Als Nächstes: 4 Klimmzüge“. Ansagen: „Pause 20 Sekunden. Nächster Satz: 4 Klimmzüge“, dann 3-2-1 und „Los: 4 Klimmzüge“. Bei „Ohne Limit“ läuft die Uhr hoch, nach der letzten Runde ist ohne weitere Pause Schluss (Sicherheitsgrenze 4 h). Der Fortschrittsbalken zeigt dann die Sätze.
+- **Erholung:** Vor dem Start erscheint die Erholungswarnung für alle beteiligten Muskelgruppen (eine Uhr je Gruppe). „Trotzdem starten“ verkleinert die Sätze der betroffenen Schritte. Nach dem Training läuft die Erholung für jede beteiligte Gruppe. Mehrere Erholungs-Erinnerungen können gleichzeitig laufen.
+- **Verlauf:** ein Eintrag je Einheit mit `type: 'combo'`, `comboId`, `name`, `perEx` (Wdh. je Übung), `steps` und `sets` (jeder Satz mit `ex`). `exercise` ist `null`. Dadurch zählen Kombis **nicht** für „Rekord 5 min“, Bestwerte und Tempo der einzelnen Übungen. „Zuletzt“ und der Verlauf zeigen den Namen mit dem Etikett „Kombi“. Das Ergebnis zeigt Summen je Übung und gesamt.
+- **Diagramm:** Umschalter **Regulär | Kombi | Gesamt**, Standard Regulär.
+  - **Regulär:** wie bisher, nur Einzel-Einheiten.
+  - **Kombi:** nur Kombi-Einheiten. Übungsfilter: „Alle“ ergibt Summe pro Tag, eine einzelne Übung deren Wdh. pro Kombi-Einheit. Dauer-Chips inkl. „Ohne Limit“.
+  - **Gesamt:** Einzel- und Kombi-Einheiten. Die **Dauer wird ignoriert** und die Wiederholungen je Tag werden addiert (bei gewählter Übung nur deren Wdh.). Grund: Eine 5-min-Einzel-Einheit und eine 10-min-Kombi lassen sich nicht pro Einheit vergleichen, die Tagessumme beschreibt das Volumen aber für beide.
+  - Jeder Modus hat einen eigenen leeren Zustand und Wochenvergleich.
+- **Wochenplan:** Kombis lassen sich als Plan-Eintrag wählen (Gruppe „Kombi“). Die Abstandsprüfung nutzt alle Muskelgruppen der Kombi.
+- **Tests:** `tests/e2e-combo.mjs` (Anlegen über die UI, Ablauf mit Fake-Clock, Ansagen, Pausen, Zeitende, Verlauf, Kacheln, Diagramm, Erholung). `tests/e2e-layout.mjs` prüft zusätzlich Kombi-Satz und -Pause auf allen Größen.
+
 ## Pause-Layout, Animationen-Einstellung und Updates (v1.6.1)
 
 - **Pause-Ring ohne Überlappung:** Der Ring sitzt in einer eigenen Fläche (`.ringbox`, Container-Query) und nimmt nur den Platz, der nach Statistik, Bewertung, „Letzter Satz“ und Buttons übrig bleibt (`width: min(60vw, 240px, 100cqh, 100cqw)`). Alle anderen Elemente bleiben im normalen Fluss. Bei niedrigen Bildschirmen (≤ 700 px) wird kompakter gesetzt. Im Querformat (Höhe ≤ 520 px) zeigt der Timer drei Spalten. Getestet auf 360×640, 375×667, 390×844, 412×915 und 844×390, jeweils für Vorlauf, Satz, Pause mit Hochrechnung und Fitnesstest (`tests/e2e-layout.mjs`, prüft, dass sich keine `getBoundingClientRect` überschneiden).
@@ -145,6 +161,7 @@ npm run build        # dist/ bauen
 npm test             # Unit-Tests (node:test)
 npm run test:e2e     # E2E (Playwright, Fake-Clock); optional URL: node tests/e2e.mjs <URL>
 node tests/e2e-week.mjs [URL]   # E2E Wochenplan, Kalender, Erinnerung, Strichmännchen
+node tests/e2e-combo.mjs [URL]  # E2E Kombi-Training
 npm run icons        # PNG-Icons aus icon.svg erzeugen
 ```
 

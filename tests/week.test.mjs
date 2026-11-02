@@ -108,3 +108,9 @@ test('Figuren: SVG-Markup, Phase und neutrales Icon', () => {
   assert.equal(F.phaseAt(0), 0); assert.ok(Math.abs(F.phaseAt(1000) - 1) < 1e-9); assert.ok(Math.abs(F.phaseAt(2000)) < 1e-9);
   assert.ok(!/NaN/.test(F.frameSvg('Klimmzüge', 0.5)));
 });
+
+test('v1.7.0 musclesOfInfo: Kombi umfasst alle Muskelgruppen ihrer Übungen', () => {
+  const g = W.musclesOfInfo({ exercise: 'Kombi', exercises: ['Liegestütze', 'Klimmzüge'], combo: true });
+  const names = [].concat(g).map(x => x.name ?? x).join(' ');
+  assert.match(names, /Brust/); assert.match(names, /Rücken/);
+});

@@ -103,20 +103,31 @@ export function createSession(workout, now) {
     target: 0, setStartedAt: now, restEndsAt: null, restMs: 0, tapCount: 0,
     pendingPhase: false, lastCountSec: null, minuteCued: false, sets: [], endedAt: null,
   };
+  // v1.7.0 Kombi: feste Schrittfolge (Übung, Wdh., Pause), Runden wiederholen; mit Zeitlimit oder fester Rundenzahl
+  if (workout.combo) {
+    const c = workout.combo;
+    s.combo = { steps: c.steps.map(x => ({ exercise: x.exercise, reps: x.reps, restSec: x.restSec })), rounds: c.rounds ?? null };
+    s.stepIdx = 0; s.cRound = 1; s.countMode = 'set'; s.adapt = { ...s.adapt, enabled: false };
+    if (s.combo.rounds) { s.limitMs = 0; s.endsAt = now + UNTIMED_CAP_MS; } // „Ohne Limit“: Uhr zählt hoch, Sicherheitsgrenze 4 h
+  }
   s.target = targetFor(s);
-  return { state: s, events: [{ type: 'go', target: s.target, first: true }] };
+  const ev = { type: 'go', target: s.target, first: true };
+  if (s.combo) ev.ex = s.combo.steps[0].exercise;
+  return { state: s, events: [ev] };
 }
 
 export function targetFor(s) {
+  if (s.combo) return Math.max(1, s.combo.steps[s.stepIdx].reps);
   const p = s.phases[s.phaseIdx];
   return Math.max(Math.min(p.reps, s.adapt.minReps), p.reps - s.repAdj, 1);
 }
-export const restSecFor = s => Math.max(0, s.phases[s.phaseIdx].restSec + s.restAdj);
+export const restSecFor = s => s.combo ? Math.max(0, s.combo.steps[s.stepIdx].restSec) : Math.max(0, s.phases[s.phaseIdx].restSec + s.restAdj);
 export const total = s => s.sets.reduce((a, x) => a + x.done, 0);
 
 function startSet(s, at, events) {
   s.status = 'work'; s.setStartedAt = at; s.tapCount = 0; s.restEndsAt = null; s.lastCountSec = null;
   const ev = { type: 'go', target: s.target };
+  if (s.combo) ev.ex = s.combo.steps[s.stepIdx].exercise;
   if (s.pendingPhase) { const p = s.phases[s.phaseIdx]; ev.phase = { idx: s.phaseIdx, reps: s.target, restSec: restSecFor(s), prevReps: s.phases[s.phaseIdx - 1].reps, prevRest: s.phases[s.phaseIdx - 1].restSec, rounds: p.rounds }; }
   s.pendingPhase = false;
   events.push(ev);
@@ -136,6 +147,7 @@ export function completeSet(s, done, now) {
   const at = Math.min(now, s.endsAt);
   const rec = { n: s.setNo, phase: s.phaseIdx, round: s.round, target, done,
     start: s.setStartedAt - s.startedAt, end: at - s.startedAt, partial: false, rate: done < target ? 'fail' : 'ok' };
+  if (s.combo) { rec.ex = s.combo.steps[s.stepIdx].exercise; rec.step = s.stepIdx; }
   s.sets.push(rec);
   events.push({ type: 'set', rec });
   if (done < target && s.adapt.enabled) {
@@ -146,6 +158,17 @@ export function completeSet(s, done, now) {
   }
   if (now >= s.endsAt) { finish(s, now, events, 'time'); return events; }
   const restSec = restSecFor(s); // Pause gehört zum gerade beendeten Satz
+  if (s.combo) {
+    const n = s.combo.steps.length;
+    s.setNo++; s.stepIdx++;
+    if (s.stepIdx >= n) { s.stepIdx = 0; s.cRound++; }
+    s.round = s.cRound;
+    if (s.combo.rounds && s.cRound > s.combo.rounds) { finish(s, now, events, 'rounds'); return events; } // letzte Runde: keine Pause mehr
+    s.target = targetFor(s);
+    s.status = 'rest'; s.restMs = restSec * 1000; s.restEndsAt = now + s.restMs; s.lastCountSec = null;
+    events.push({ type: 'rest', sec: restSec, nextTarget: s.target, nextEx: s.combo.steps[s.stepIdx].exercise, phaseNext: false });
+    return events.concat(tick(s, now));
+  }
   const p = s.phases[s.phaseIdx];
   s.round++; s.setNo++;
   if (p.rounds != null && s.round > p.rounds && s.phaseIdx < s.phases.length - 1) {
@@ -198,7 +221,8 @@ export function finishPartial(s, done, now) {
   const events = [];
   if (done > 0) {
     const rec = { n: s.setNo, phase: s.phaseIdx, round: s.round, target: s.target, done,
-      start: s.setStartedAt - s.startedAt, end: s.limitMs, partial: true };
+      start: s.setStartedAt - s.startedAt, end: s.endsAt - s.startedAt, partial: true };
+    if (s.combo) { rec.ex = s.combo.steps[s.stepIdx].exercise; rec.step = s.stepIdx; }
     s.sets.push(rec); events.push({ type: 'set', rec });
   }
   finish(s, now, events, 'time');
@@ -245,7 +269,7 @@ export function summary(s) {
 /** Hochrechnung auf Zeitende anhand des bisherigen Tempos. */
 export function projection(s, now) {
   const el = Math.min(now, s.endsAt) - s.startedAt; const t = total(s);
-  if (t === 0 || el < 10000) return null;
+  if (!s.limitMs || t === 0 || el < 10000) return null;
   return Math.round(t * s.limitMs / el);
 }
 
@@ -279,7 +303,7 @@ export const MAX_PHASES = 4;
 
 /** Gemessenes Tempo (s/Wdh.) aus den letzten Einheiten einer Übung: Median über volle Sätze, mind. 3 Sätze. */
 export function measuredSecPerRep(history, exercise, lastN = 3) {
-  const runs = history.filter(h => h.exercise === exercise && !h.aborted && Array.isArray(h.sets)).slice(-lastN);
+  const runs = history.filter(h => !isCombo(h) && h.exercise === exercise && !h.aborted && Array.isArray(h.sets)).slice(-lastN);
   const v = [];
   for (const h of runs) for (const x of h.sets) if (!x.partial && x.done > 0 && x.end > x.start) v.push((x.end - x.start) / 1000 / x.done);
   if (v.length < 3) return null;
@@ -470,7 +494,7 @@ export function sessionLimitMin(h, info) {
 export function bestForLimit(history, exercise, limitMin = 5, info) {
   let best = null;
   for (const h of history || []) {
-    if (!h || h.aborted) continue;
+    if (!h || h.aborted || isCombo(h)) continue; // v1.7.0: Kombi-Einheiten zählen nicht für Übungs-Rekorde
     const ex = h.exercise ?? (info && h.workoutId ? info(h.workoutId)?.exercise : undefined);
     const t = +h.total;
     if (ex !== exercise || !Number.isFinite(t) || t <= 0 || sessionLimitMin(h, info) !== limitMin) continue;
@@ -491,22 +515,31 @@ const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.
  * summary: Ø der ersten Woche (7 Tage ab erstem Punkt) vs. Ø der letzten 7 Tage; nur wenn sich beide nicht überschneiden.
  * limits: vorhandene Zeitlimits (min) im Zeitraum für die Auswahl, absteigend nach Anzahl.
  */
-export function devSeries(history, maxes, { exercise = null, limitMin = null, now, days = 30, info } = {}) {
+export function devSeries(history, maxes, { exercise = null, limitMin = null, now, days = 30, info, mode = 'reg' } = {}) {
+  // v1.7.0 mode: 'reg' = nur Einzel-EDT (bisheriges Verhalten), 'combo' = nur Kombi-Einheiten (bei einer Übung: deren Wdh. in der Kombi),
+  // 'all' = Gesamt: beide Methoden, Dauer egal, Summe der Wdh. je Tag.
+  mode = ['reg', 'combo', 'all'].includes(mode) ? mode : 'reg';
   const end = dayStart(now) + DAY_MS, start = end - days * DAY_MS;
-  const ok = (history || []).filter(h => h && !h.aborted && Number.isFinite(+h.total) && +h.total > 0 && Date.parse(h.date) >= start && Date.parse(h.date) < end)
-    .map(h => ({ h, ex: h.exercise ?? (info && h.workoutId ? info(h.workoutId)?.exercise : undefined), lim: sessionLimitMin(h, info), t: Date.parse(h.date) }))
-    .filter(x => x.lim && (exercise == null || x.ex === exercise));
-  const cnt = {}; for (const x of ok) cnt[x.lim] = (cnt[x.lim] || 0) + 1;
+  const ok = (history || []).filter(h => h && !h.aborted && Number.isFinite(+h.total) && +h.total > 0 && Date.parse(h.date) >= start && Date.parse(h.date) < end
+      && (mode === 'all' || (mode === 'combo') === isCombo(h)))
+    .map(h => {
+      const c = isCombo(h), ex = c ? null : h.exercise ?? (info && h.workoutId ? info(h.workoutId)?.exercise : undefined);
+      const v = exercise == null ? +h.total : c ? +(h.perEx?.[exercise] || 0) : ex === exercise ? +h.total : 0;
+      return { h, ex, c, v, lim: c ? (sessionLimitMin(h) ?? 0) : sessionLimitMin(h, info), t: Date.parse(h.date) };
+    })
+    .filter(x => x.v > 0 && (x.c || x.lim));
+  const cnt = {}; if (mode !== 'all') for (const x of ok) cnt[x.lim] = (cnt[x.lim] || 0) + 1;
   const limits = Object.keys(cnt).map(Number).sort((a, b) => cnt[b] - cnt[a] || a - b);
-  const lim = limitMin != null && cnt[limitMin] ? limitMin : limits[0] ?? null;
+  const lim = mode === 'all' ? null : limitMin != null && cnt[limitMin] ? limitMin : limits[0] ?? null;
+  const sum = mode === 'all' || exercise == null;
   const byDay = new Map();
-  for (const x of ok.filter(x => x.lim === lim).sort((a, b) => a.t - b.t)) {
+  for (const x of ok.filter(x => mode === 'all' || x.lim === lim).sort((a, b) => a.t - b.t)) {
     const d = dayStart(x.t); if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(x);
   }
   const points = [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([day, xs]) => {
-    const best = xs.reduce((b, x) => (+x.h.total > +b.h.total ? x : b));
-    return { day, value: exercise == null ? xs.reduce((a, x) => a + +x.h.total, 0) : +best.h.total,
-      sessions: xs.map(x => ({ id: x.h.id, total: +x.h.total, name: x.h.workoutName || x.h.name || '', exercise: x.ex })), bestId: best.h.id };
+    const best = xs.reduce((b, x) => (x.v > b.v ? x : b));
+    return { day, value: sum ? xs.reduce((a, x) => a + x.v, 0) : best.v,
+      sessions: xs.map(x => ({ id: x.h.id, total: x.v, name: x.h.workoutName || x.h.name || '', exercise: x.ex, combo: x.c })), bestId: best.h.id };
   });
   const trend = points.length >= 3 ? points.map((p, i) => { const w = points.slice(Math.max(0, i - 2), i + 1); return w.length < 3 ? null : { day: p.day, value: w.reduce((a, q) => a + q.value, 0) / 3 }; }).filter(Boolean) : [];
   const tests = exercise == null ? [] : ((maxes || {})[exercise] || []).filter(m => m && Number.isFinite(+m.v) && Date.parse(m.date) >= start && Date.parse(m.date) < end)
@@ -520,7 +553,7 @@ export function devSeries(history, maxes, { exercise = null, limitMin = null, no
       summary = { first: a, last: b, pct: Math.round((b / a - 1) * 100), nFirst: first.length, nLast: last.length };
     }
   }
-  return { start, end, days, limitMin: lim, limits, points, trend, tests, summary };
+  return { start, end, days, mode, limitMin: lim, limits, points, trend, tests, summary, sum };
 }
 /** „Schöne“ Achsenwerte zwischen lo und hi (ca. n Stück). */
 export function niceTicks(lo, hi, n = 4) {
@@ -530,6 +563,51 @@ export function niceTicks(lo, hi, n = 4) {
   const out = []; for (let v = Math.floor(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1e6) / 1e6);
   if (out.at(-1) < hi) out.push(out.at(-1) + step);
   return out;
+}
+
+// ---------- Kombi-Training (v1.7.0) ----------
+/** Kombi = 2–4 Schritte (Übung, Wdh., Pause danach), abwechselnd wiederholt. Modus 'time' (Zeitlimit) oder 'rounds' (feste Rundenzahl, ohne Limit). */
+export const COMBO_LIMITS = [5, 10, 15, 20];
+export const COMBO_MIN_STEPS = 2, COMBO_MAX_STEPS = 4;
+export const UNTIMED_CAP_MS = 4 * 3600000;
+export const isCombo = h => !!h && h.type === 'combo';
+/** Vorschlag Wdh. je Schritt: 40 % vom Fitnesstest-Maximum (gerundet, mind. 1), ohne Test 5. */
+export const comboReps = max => (Number.isFinite(+max) && +max > 0 ? Math.max(1, Math.round(+max * 0.4)) : 5);
+export const comboAutoName = steps => [...new Set(steps.map(x => x.exercise))].join(' & ');
+// Zeitlimit auf die Chips 5/10/15/20 min einrasten (nächstliegender Wert)
+const snapLimit = m => COMBO_LIMITS.reduce((a, b) => Math.abs(b - m) < Math.abs(a - m) ? b : a, COMBO_LIMITS[1]);
+export function normalizeCombo(c) {
+  c = c || {};
+  const steps = (Array.isArray(c.steps) ? c.steps : []).filter(Boolean).slice(0, COMBO_MAX_STEPS)
+    .map(x => ({ exercise: EXERCISES.includes(x.exercise) ? x.exercise : EXERCISES[0], reps: clamp(int(x.reps, 5), 1, 999), restSec: clamp(int(x.restSec, 20), 0, 600) }));
+  while (steps.length < COMBO_MIN_STEPS) steps.push({ exercise: steps.length ? 'Klimmzüge' : 'Liegestütze', reps: 5, restSec: 20 });
+  return {
+    id: String(c.id || 'c' + Math.random().toString(36).slice(2, 10)),
+    name: String(c.name || '').trim().slice(0, 60) || comboAutoName(steps),
+    steps, mode: c.mode === 'rounds' ? 'rounds' : 'time',
+    limitMin: snapLimit(int(c.limitMin, 10)), rounds: clamp(int(c.rounds, 5), 1, 99),
+  };
+}
+export const comboExercises = c => [...new Set(c.steps.map(x => x.exercise))];
+/** Workout-Objekt für createSession. */
+export function comboWorkout(c) {
+  c = normalizeCombo(c);
+  return { id: c.id, name: c.name, exercise: 'Kombi', limitMin: c.mode === 'time' ? c.limitMin : 60,
+    phases: [{ reps: c.steps[0].reps, restSec: c.steps[0].restSec, rounds: null }], countMode: 'set',
+    combo: { steps: c.steps, rounds: c.mode === 'rounds' ? c.rounds : null } };
+}
+/** Wdh. je Übung aus den Sätzen einer Kombi-Einheit (Reihenfolge wie in der Kombi). */
+export function comboTotals(sets, steps = []) {
+  const out = {}; for (const x of steps) out[x.exercise] = 0;
+  for (const x of sets || []) if (x.ex) out[x.ex] = (out[x.ex] || 0) + (+x.done || 0);
+  return out;
+}
+/** Planwerte: Dauer einer Runde (s) bei Tempo je Übung, Runden bzw. Gesamtdauer. */
+export function comboPlan(c, sprOf = secPerRepFor) {
+  c = normalizeCombo(c);
+  const roundSec = c.steps.reduce((a, x) => a + x.reps * sprOf(x.exercise) + x.restSec, 0);
+  if (c.mode === 'rounds') return { roundSec, rounds: c.rounds, durSec: Math.max(0, roundSec * c.rounds - c.steps.at(-1).restSec) };
+  return { roundSec, rounds: Math.floor(c.limitMin * 60 / Math.max(1, roundSec) * 10) / 10, durSec: c.limitMin * 60 };
 }
 
 // Vorlagen: Phasen = Plan aus einem typischen Mittel-Maximum (werden nach dem Fitnesstest neu berechnet).

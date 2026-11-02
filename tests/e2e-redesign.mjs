@@ -51,7 +51,7 @@ await page.reload(); await page.waitForSelector('.extiles');
 assert.equal((await page.textContent('.hd h1')).trim(), 'Training');
 assert.equal((await page.textContent('.hd span')).trim(), 'Samstag, 31.10.');
 assert.doesNotMatch(await page.textContent('body'), /Escalating Density Training/);
-assert.deepEqual(await page.$$eval('.sh h2', e => e.map(x => x.textContent)), ['Heute', 'Übungen', 'Zuletzt']);
+assert.deepEqual(await page.$$eval('.sh h2', e => e.map(x => x.textContent)), ['Heute', 'Übungen', 'Kombi', 'Zuletzt']);
 assert.deepEqual(await page.$$eval('.sh .lk', e => e.map(x => x.textContent)), ['Wochenplan ›', 'Fitnesstest ›', 'Verlauf ›']);
 assert.equal((await page.textContent('.nx .eyebrow')).trim(), 'Als Nächstes · 19:00');
 assert.equal((await page.textContent('.nx .hname')).trim(), 'Klimmzüge');

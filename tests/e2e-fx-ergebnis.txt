@@ -1,8 +1,8 @@
-2026-11-02T20:00:42.577Z http://127.0.0.1:18739/
-✓ Startseite: Hintergrund „home“ (fxa, 20–40 s), oben sichtbar ≤ 300 ms, Karten unten blenden beim Scrollen ein – 30s, 4 Elemente unten
+2026-11-02T20:47:17.323Z http://127.0.0.1:18739/
+✓ Startseite: Hintergrund „home“ (fxa, 20–40 s), oben sichtbar ≤ 300 ms, Karten unten blenden beim Scrollen ein – 30s, 5 Elemente unten
 ✓ Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,5 s punktuell, Panel öffnet – --gx 241px
 ✓ Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt – --gx 76px --gy 602.438px
-✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 947, Folge 799 595 745 658 694 968 464 187 164 167 128 128
+✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 749, Folge 656 548 579 696 895 467 694 145 197 155 124 124
 ✓ Verlauf: Panels/Einträge mit Einblendung, oben sofort sichtbar
 ✓ Seite verborgen → Hintergrund pausiert, danach weiter
 ✓ Timer: Hintergrund „work“ im Satz, „rest“ in der Pause (Überblendung 1,2 s), Uhr läuft genau – 8:00 → 7:49 nach 10 s
@@ -11,6 +11,6 @@
 ✓ Automatisch + System reduziert: sanfte Stufe – Glow nur Überblendung, Einblenden ohne Versatz, Hintergrund atmet statt zu wandern, Figuren statisch, Ziffern-Effekt läuft
 ✓ Automatisch ohne Systemvorgabe: volle Effekte
 ✓ Aus: kein Glow, keine Einblendung, kein Ziffern-Effekt/Leuchten, Hintergrund statisch (animation none)
-✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.6.3-f6ffd8c4
+✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.7.0-4a49562c
 ✓ Kontrast über die ganze Hintergrund-Schleife ≥ 4,5:1 für grauen Text – home: hellster Punkt rgb(42,54,22) → grau 4.67:1, weiß 11.71:1 | work: hellster Punkt rgb(43,54,22) → grau 4.66:1, weiß 11.68:1 | rest: hellster Punkt rgb(19,52,62) → grau 4.81:1, weiß 12.07:1
-✓ Ohne IntersectionObserver: nichts versteckt, alle Karten sichtbar – 10 Elemente
+✓ Ohne IntersectionObserver: nichts versteckt, alle Karten sichtbar – 11 Elemente

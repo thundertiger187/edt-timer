@@ -1,6 +1,6 @@
 // Lokale Speicherung (localStorage). Kein Server.
-import { TEMPLATES, normalizeWorkout } from './engine.js';
-const NAMES = { w: 'workouts', h: 'history', s: 'settings', a: 'active', m: 'maxes', t: 'tunes', p: 'plan' };
+import { TEMPLATES, normalizeWorkout, normalizeCombo } from './engine.js';
+const NAMES = { w: 'workouts', h: 'history', s: 'settings', a: 'active', m: 'maxes', t: 'tunes', p: 'plan', c: 'combos' };
 const K = Object.fromEntries(Object.entries(NAMES).map(([k, n]) => [k, 'edt.' + n]));
 /** Umbenennung RepZeit → EDT Timer: alte Schlüssel repzeit.* (gleiche Origin) einmalig nach edt.* kopieren.
  *  Die alten Einträge bleiben als Sicherung stehen. Gibt zurück, welche Schlüssel übernommen wurden. */
@@ -38,6 +38,9 @@ export const store = {
   setTune(ex, t) { const all = this.tunes(); if (t) all[ex] = t; else delete all[ex]; write(K.t, all); return all; },
   // Wochenplan { entries: [{ id, day 0=Mo…6=So, time 'HH:MM', workoutId }], alarmBefore, remind, removed, seq, exportedSig, exportedAt }
   plan() { return read(K.p, null); },
+  // v1.7.0 Kombi-Training: [{ id, name, steps: [{ exercise, reps, restSec }], mode: 'time'|'rounds', limitMin, rounds }]
+  combos() { const l = read(K.c, []); return Array.isArray(l) ? l.filter(Boolean).map(normalizeCombo) : []; },
+  saveCombos(list) { write(K.c, list); },
   savePlan(p) { write(K.p, p); },
   active() { return read(K.a, null); },
   saveActive(a) { if (a) write(K.a, a); else localStorage.removeItem(K.a); },
@@ -46,7 +49,7 @@ export const store = {
     for (const t of TEMPLATES) { const i = list.findIndex(x => x.id === t.id); if (i >= 0) list[i] = structuredClone(t); else list.push(structuredClone(t)); }
     this.saveWorkouts(list); return list;
   },
-  exportAll() { return { app: 'EDT Timer', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), tunes: this.tunes(), settings: this.settings(), plan: this.plan() }; },
+  exportAll() { return { app: 'EDT Timer', format: 1, exportedAt: new Date().toISOString(), workouts: this.workouts(), history: this.history(), maxes: this.maxes(), tunes: this.tunes(), settings: this.settings(), plan: this.plan(), combos: this.combos() }; },
   importAll(data) {
     if (!data || !['EDT Timer', 'RepZeit'].includes(data.app) || !Array.isArray(data.workouts) || !Array.isArray(data.history)) throw new Error('Keine gültige EDT-Timer-Datei.');
     const w = this.workouts(), h = this.history();
@@ -67,6 +70,7 @@ export const store = {
     }
     if (data.tunes && typeof data.tunes === 'object') write(K.t, { ...this.tunes(), ...data.tunes });
     if (data.plan && Array.isArray(data.plan.entries)) write(K.p, data.plan);
+    if (Array.isArray(data.combos)) { const c = this.combos(); for (const x of data.combos.filter(Boolean).map(normalizeCombo)) { const i = c.findIndex(y => y.id === x.id); if (i >= 0) c[i] = x; else c.push(x); } write(K.c, c); }
     if (data.settings) this.saveSettings({ ...this.settings(), ...data.settings });
     return { workouts: nw, sessions: nh };
   },

@@ -183,7 +183,7 @@ const resultState = async page => {
   const opts = await page.$$eval('[data-anim]', e => e.map(b => [b.dataset.anim, b.textContent, b.getAttribute('aria-checked')]));
   assert.deepEqual(opts, [['auto', 'Automatisch', 'false'], ['on', 'An', 'true'], ['off', 'Aus', 'false']]);
   assert.match(await page.textContent('#anim-info'), /überstimmt/);
-  assert.match(await page.textContent('#app-ver'), /^1\.6\.3-[0-9a-f]{8}$/);
+  assert.match(await page.textContent('#app-ver'), /^1\.7\.0-[0-9a-f]{8}$/);
   await page.click('[data-anim=auto]');
   assert.equal(await page.evaluate(() => document.documentElement.dataset.motion), 'gentle');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('edt.settings')).anim), 'auto');

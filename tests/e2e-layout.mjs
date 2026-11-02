@@ -25,7 +25,12 @@ const GROUPS = {
   rest: ['.ttop', '.clock', '.stats2', '.train > .pos', '.ringwrap', '.next', '.restbar .rate', '.restbar .last', '[data-act=skip]'],
   testlead: ['.ttop', '.leadbox > .lbl:first-child', '.leadnum', '.leadbox > .lbl:last-child'],
   testrun: ['.ttop', '.testclock .badge', '#a-time', '.testclock > .lbl', '.hit.stop'],
+  // v1.7.0 Kombi: aktuelle Übung groß, nächster Schritt darunter
+  cwork: ['.ttop', '.clock', '.stats2', '.train > .pos', '.cwork .cex', '.cwork .lbl', '.adj', '.cwork .cnext', '.hit'],
+  crest: ['.ttop', '.clock', '.stats2', '.train > .pos', '.ringwrap', '.next', '.restbar .rate', '.restbar .last', '[data-act=skip]'],
 };
+const COMBO = [{ id: 'c-lay', name: 'Push & Pull Langname Test', steps: [{ exercise: 'Liegestütze', reps: 12, restSec: 20 }, { exercise: 'Klimmzüge', reps: 4, restSec: 20 }, { exercise: 'Kniebeugen', reps: 15, restSec: 30 }], mode: 'time', limitMin: 10, rounds: 5 }];
+const COMBO_SHOTS = { '360x640': '75_kombi_360.png', '844x390': '76_kombi_landscape.png' };
 const measure = (page, sels) => page.evaluate(sels => {
   const R = sels.map(s => { const e = document.querySelector(s); if (!e) return { s, missing: true }; const r = e.getBoundingClientRect(); return { s, x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; });
   const bad = [], tol = 0.5, vw = innerWidth, vh = innerHeight;
@@ -84,8 +89,17 @@ for (const [w, h] of VIEWPORTS) {
   await page.waitForSelector('[data-act=assess-test]'); await page.click('[data-act=assess-test]'); await page.waitForSelector('#a-lead');
   r.testlead = await check(page, vp, 'testlead');
   await page.clock.runFor(3200); await page.waitForSelector('#a-time'); r.testrun = await check(page, vp, 'testrun');
+  // v1.7.0 Kombi-Training: Satz und Pause
+  await page.evaluate(c => localStorage.setItem('edt.combos', JSON.stringify(c)), COMBO);
+  await page.reload(); await page.waitForSelector('.ccard [data-act=combo-start]'); await page.click('.ccard [data-act=combo-start]');
+  await page.waitForSelector('#t-lead'); await page.clock.runFor(5100); await page.waitForSelector('.cwork'); await page.waitForTimeout(100);
+  r.cwork = await check(page, vp, 'cwork');
+  await page.click('[data-act=done]'); await page.waitForSelector('[data-act=skip]'); await page.clock.runFor(2000); await page.waitForTimeout(100);
+  r.crest = await check(page, vp, 'crest'); await inside(page, vp);
+  await page.click('[data-act=skip]'); await page.waitForSelector('.cwork'); await page.waitForTimeout(100); r.cwork2 = await check(page, vp, 'cwork');
+  if (COMBO_SHOTS[vp]) await page.screenshot({ path: path.join(SCREENS, COMBO_SHOTS[vp]) });
   if (!REPORT) assert.deepEqual(errors, []);
-  ok(`${vp}: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest – keine Überlappung, alles im Bildschirm`, `Ring ${r.rest.ring}/${r.rest2.ring} px`);
+  ok(`${vp}: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm`, `Ring ${r.rest.ring}/${r.rest2.ring}/${r.crest.ring} px`);
   await ctx.close();
 }
 fs.writeFileSync(path.join(ROOT, 'tests', 'e2e-layout-ergebnis.txt'), `${new Date().toISOString()} ${base}\n${log.join('\n')}\n`);

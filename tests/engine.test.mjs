@@ -401,3 +401,68 @@ test('niceTicks: runde Achsenwerte, deckt Bereich ab', () => {
   assert.deepEqual(E.niceTicks(0, 9, 3), [0, 5, 10]);
   const t = E.niceTicks(5, 5); assert.ok(t[0] <= 5 && t.at(-1) >= 5);
 });
+
+// ---- v1.7.0 Kombi ----
+const PP = () => ({ id: 'c1', name: 'Push & Pull', steps: [{ exercise: 'Liegestütze', reps: 12, restSec: 20 }, { exercise: 'Klimmzüge', reps: 4, restSec: 20 }], mode: 'time', limitMin: 10, rounds: 5 });
+
+test('Kombi: Schritte wechseln sich ab, Ziel und Pause je Schritt, Runden zählen hoch', () => {
+  let now = 0; const { state: s, events } = E.createSession(E.comboWorkout(PP()), now);
+  assert.equal(s.limitMs, 600 * S); assert.equal(s.target, 12);
+  const go0 = events.find(e => e.type === 'go'); assert.equal(go0?.ex, 'Liegestütze');
+  const seen = [];
+  for (let i = 0; i < 5; i++) {
+    now += 10 * S; const ev = E.completeSet(s, s.target, now);
+    const r = ev.find(e => e.type === 'rest'); seen.push([s.sets.at(-1).ex, s.sets.at(-1).done, r.sec, r.nextEx, r.nextTarget]);
+    now = s.restEndsAt; const go = E.tick(s, now).find(e => e.type === 'go'); assert.ok(go);
+  }
+  assert.deepEqual(seen, [['Liegestütze', 12, 20, 'Klimmzüge', 4], ['Klimmzüge', 4, 20, 'Liegestütze', 12], ['Liegestütze', 12, 20, 'Klimmzüge', 4], ['Klimmzüge', 4, 20, 'Liegestütze', 12], ['Liegestütze', 12, 20, 'Klimmzüge', 4]]);
+  assert.equal(s.cRound, 3); assert.equal(s.stepIdx, 1);
+  assert.deepEqual(E.comboTotals(s.sets, PP().steps), { 'Liegestütze': 36, 'Klimmzüge': 8 });
+});
+
+test('Kombi ohne Limit: endet nach N Runden ohne Pause nach dem letzten Satz', () => {
+  const c = { ...PP(), mode: 'rounds', rounds: 2 };
+  let now = 0; const { state: s } = E.createSession(E.comboWorkout(c), now);
+  assert.equal(s.limitMs, 0); assert.ok(s.endsAt >= E.UNTIMED_CAP_MS);
+  let last = [];
+  for (let i = 0; i < 4; i++) { now += 30 * S; last = E.completeSet(s, s.target, now); if (s.status === 'rest') { now = s.restEndsAt; E.tick(s, now); } }
+  assert.equal(s.status, 'done'); assert.ok(!last.some(e => e.type === 'rest'), 'keine Pause nach dem letzten Satz');
+  assert.ok(last.some(e => e.type === 'done'));
+  assert.equal(s.sets.length, 4); assert.equal(E.total(s), 32);
+  assert.equal(E.tick(s, now + 5 * 3600 * S).length, 0);
+});
+
+test('Kombi: Zeitende im Satz → Teilsatz zählt für die aktuelle Übung', () => {
+  let now = 0; const { state: s } = E.createSession(E.comboWorkout(PP()), now);
+  while (true) { now += 15 * S; if (now >= s.endsAt) { E.tick(s, now); break; } E.completeSet(s, s.target, now); now = s.restEndsAt; if (now >= s.endsAt) { E.tick(s, now); break; } E.tick(s, now); }
+  assert.equal(s.status, 'partial');
+  const ex = E.comboTotals(s.sets, PP().steps), curEx = PP().steps[s.stepIdx].exercise;
+  E.finishPartial(s, 2, now);
+  assert.equal(s.status, 'done'); assert.equal(s.sets.at(-1).ex, curEx); assert.equal(s.sets.at(-1).end, 600 * S);
+  const t2 = E.comboTotals(s.sets, PP().steps); assert.equal(t2[curEx], ex[curEx] + 2);
+  assert.deepEqual(t2, { 'Liegestütze': 108, 'Klimmzüge': 34 });
+});
+
+test('Kombi: Vorgabe 40 % vom Max, mind. 1, ohne Max 5; normalizeCombo begrenzt 2–4 Schritte', () => {
+  assert.equal(E.comboReps(30), 12); assert.equal(E.comboReps(10), 4); assert.equal(E.comboReps(1), 1); assert.equal(E.comboReps(null), 5); assert.equal(E.comboReps(7), 3);
+  const n = E.normalizeCombo({ name: '', steps: [{ exercise: 'Dips', reps: 0, restSec: -1 }, ...Array(5).fill({ exercise: 'Kniebeugen', reps: 10, restSec: 30 })], mode: 'x', limitMin: 7 });
+  assert.equal(n.steps.length, E.COMBO_MAX_STEPS); assert.equal(n.steps[0].reps, 1); assert.equal(n.steps[0].restSec, 0);
+  assert.ok(E.COMBO_LIMITS.includes(n.limitMin)); assert.ok(n.name.length > 0);
+  assert.ok(E.normalizeCombo({ steps: [{ exercise: 'Dips', reps: 5, restSec: 10 }] }).steps.length >= E.COMBO_MIN_STEPS);
+});
+
+test('Kombi-Einheiten zählen nicht für Rekorde; devSeries trennt Regulär/Kombi, Gesamt summiert je Tag', () => {
+  const now = Date.parse('2026-11-02T18:00:00Z'), D = 86400000;
+  const single = { id: 's', workoutId: 'tpl-liegestuetz-5', exercise: 'Liegestütze', limitMs: 300000, total: 90, sets: [{ done: 90, target: 90 }], date: new Date(now - D).toISOString(), elapsedMs: 300000 };
+  const combo = { id: 'c', type: 'combo', comboId: 'c1', workoutId: 'c1', name: 'PP', workoutName: 'PP', exercise: null, exercises: ['Liegestütze', 'Klimmzüge'], mode: 'time', limitMs: 300000, total: 300, perEx: { 'Liegestütze': 250, 'Klimmzüge': 50 }, sets: [{ done: 300, target: 300 }], date: new Date(now - D + 3600000).toISOString(), elapsedMs: 300000 };
+  const h = [single, combo];
+  assert.equal(E.bestForLimit(h, 'Liegestütze', 5).total, 90);
+  const reg = E.devSeries(h, {}, { now, mode: 'reg', exercise: 'Liegestütze' });
+  assert.deepEqual(reg.points.map(p => p.value), [90]);
+  const cmb = E.devSeries(h, {}, { now, mode: 'combo', exercise: 'Liegestütze' });
+  assert.deepEqual(cmb.points.map(p => p.value), [250]); assert.ok(cmb.points[0].sessions.every(x => x.combo));
+  const all = E.devSeries(h, {}, { now, mode: 'all' });
+  assert.deepEqual(all.points.map(p => p.value), [390]); assert.equal(all.limitMin, null); assert.ok(all.sum);
+  const allL = E.devSeries(h, {}, { now, mode: 'all', exercise: 'Liegestütze' });
+  assert.deepEqual(allL.points.map(p => p.value), [340]);
+});
