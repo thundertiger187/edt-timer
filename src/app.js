@@ -693,6 +693,10 @@ function phaseSpeech(ph) {
   return ph.reps !== ph.prevReps && ph.restSec !== ph.prevRest ? `Neue Phase: ${ph.reps} Wiederholungen, ${ph.restSec} Sekunden Pause`
     : ph.reps !== ph.prevReps ? `Neue Phase: ${ph.reps} Wiederholungen` : `Neue Phase: ${ph.restSec} Sekunden Pause`;
 }
+function restSpeech(e, s) {
+  const next = `Nächster Satz: ${e.nextTarget} ${s?.exercise || 'Wiederholungen'}`;
+  return e.sec >= 6 ? `Pause ${e.sec} Sekunden. ${next}` : next;
+}
 function handle(events) {
   if (!events.length) return;
   const s = st.session; let adapted = null;
@@ -701,7 +705,7 @@ function handle(events) {
       case 'go': st.adj = e.target; A.cue.go(); A.say(e.phase ? 'Los! ' + phaseSpeech(e.phase) : 'Los'); break;
       case 'set': A.cue.set(); break;
       case 'adapt': adapted = e; break;
-      case 'rest': if (e.sec > 0) A.say(`Pause ${e.sec} Sekunden` + (adapted && adapted.repAdj ? `. Nächster Satz ${e.nextTarget}` : '')); break;
+      case 'rest': if (e.sec > 0) A.say(restSpeech(e, s)); break; // v1.6.3: nächste Übung + Wiederholungen ansagen
       case 'count': A.cue.count(e.sec); A.say(e.sec === 3 ? 'Noch 3' : String(e.sec)); break;
       case 'minute': A.beep(740, 0.2); A.say('Noch eine Minute', { interrupt: false }); break;
       case 'tap': A.cue.tap(); break;
