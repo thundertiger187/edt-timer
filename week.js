@@ -1,5 +1,5 @@
 // Wochenplan: Einträge je Wochentag, Abstandsprüfung gegen die Erholung, Erledigt-Abgleich, Kalender-Export (.ics).
-import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=f6ffd8c4';
+import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=4a49562c';
 
 export const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 export const DAYS_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -54,15 +54,27 @@ export function copyDay(plan, from, to) {
  * Einträge desselben Tages mit gleicher/überlappender Muskelgruppe und zu kleinem Abstand.
  * Abstand = Start zu Start minus Dauer der ersten Einheit (also Ende → Start). info(workoutId) → { exercise, muscle, limitMin }.
  */
+/** Muskeln eines Plan-Eintrags: Einzel-Workout über Übung/Muskelgruppe, Kombi (v1.7.0, info.exercises) über alle Übungen. */
+export function musclesOfInfo(i) {
+  if (!i) return { name: '', muscles: [] };
+  if (Array.isArray(i.exercises) && i.exercises.length) {
+    const ms = i.exercises.map(e => musclesOf(e));
+    return { name: [...new Set(ms.map(m => m.name))].join(' + '), muscles: [...new Set(ms.flatMap(m => m.muscles))] };
+  }
+  return musclesOf(i.exercise, i.muscle);
+}
 export function planConflicts(plan, info, rec = RECOVERY_DEFAULTS) {
   const need = rec.betweenEdt ?? RECOVERY_DEFAULTS.betweenEdt, out = [];
   for (let d = 0; d < 7; d++) {
     const list = entriesOn(plan, d);
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i], b = list[j], ia = info(a.workoutId), ib = info(b.workoutId);
-      if (!ia || !ib || !overlaps(musclesOf(ia.exercise, ia.muscle), musclesOf(ib.exercise, ib.muscle))) continue;
+      if (!ia || !ib) continue;
+      const ma = musclesOfInfo(ia), mb = musclesOfInfo(ib);
+      if (!overlaps(ma, mb)) continue;
       const gap = toMin(b.time) - toMin(a.time) - (ia.limitMin || 0);
-      if (gap < need) out.push({ day: d, a: a.id, b: b.id, gapMin: gap, needMin: need, group: musclesOf(ia.exercise, ia.muscle).name });
+      const group = ia.exercises || ib.exercises ? [...new Set([ma, mb].flatMap(m => m.muscles))].filter(x => ma.muscles.includes(x) && mb.muscles.includes(x)).join('/') : ma.name;
+      if (gap < need) out.push({ day: d, a: a.id, b: b.id, gapMin: gap, needMin: need, group });
     }
   }
   return out;

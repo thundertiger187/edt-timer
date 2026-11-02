@@ -1,11 +1,11 @@
-import * as E from './engine.js?v=f6ffd8c4';
-import * as A from './audio.js?v=f6ffd8c4';
-import { store, migrated } from './store.js?v=f6ffd8c4';
-import { figureSvg, animateFigures } from './figures.js?v=f6ffd8c4';
-import * as W from './week.js?v=f6ffd8c4';
-import * as FX from './fx.js?v=f6ffd8c4';
+import * as E from './engine.js?v=4a49562c';
+import * as A from './audio.js?v=4a49562c';
+import { store, migrated } from './store.js?v=4a49562c';
+import { figureSvg, animateFigures } from './figures.js?v=4a49562c';
+import * as W from './week.js?v=4a49562c';
+import * as FX from './fx.js?v=4a49562c';
 
-const VERSION = '1.6.3-f6ffd8c4';
+const VERSION = '1.7.0-4a49562c';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,6 +19,7 @@ const st = {
   session: null, lead: null, draft: null, result: null, resultFrom: 'home', histFilter: null,
   adj: 0, layoutKey: '', sheet: null, partialVal: 0, installEvt: null, maxes: store.maxes(), assess: null,
   tunes: store.tunes(), plan: null, tuneSel: 0, week: W.normalizePlan(store.plan()), wcopy: null,
+  combos: store.combos(), cdraft: null, crec: null, devMode: 'reg',
 };
 window.__rz = st;
 
@@ -27,6 +28,7 @@ applySettings();
 
 const bestOf = id => st.history.filter(h => h.workoutId === id && !h.aborted).reduce((b, h) => (!b || h.total > b.total ? h : b), null);
 const workoutById = id => st.workouts.find(w => w.id === id);
+const comboById = id => st.combos.find(c => c.id === id);
 const maxOf = ex => { const l = st.maxes[ex]; return l && l.length ? l[l.length - 1] : null; };
 // Tempo-Schätzung: gemessen aus den letzten Einheiten, sonst Standardwert der Übung
 const testPace = mx => mx && mx.source === 'test' && mx.durMs > 0 && mx.v > 0 ? Math.round(Math.min(8, Math.max(0.8, mx.durMs / 1000 / mx.v)) * 10) / 10 : null;
@@ -47,7 +49,11 @@ const recCfg = () => ({ afterTest: st.settings.recAfterTest, betweenEdt: st.sett
 function recEvents() {
   const ev = [];
   for (const [ex, l] of Object.entries(st.maxes)) for (const m of l || []) if (m.source === 'test') ev.push({ type: 'test', exercise: ex, muscle: muscleFor(ex), at: Date.parse(m.date) });
-  for (const h of st.history) if (h.total > 0) ev.push({ type: 'edt', exercise: h.exercise, muscle: h.muscle ?? muscleFor(h.exercise), at: Date.parse(h.date) + (h.elapsedMs || 0) });
+  for (const h of st.history) if (h.total > 0) {
+    const at = Date.parse(h.date) + (h.elapsedMs || 0);
+    if (E.isCombo(h)) { for (const ex of h.exercises || Object.keys(h.perEx || {})) if ((h.perEx?.[ex] ?? 1) > 0) ev.push({ type: 'edt', exercise: ex, muscle: muscleFor(ex), at }); } // v1.7.0: jede Übung der Kombi
+    else ev.push({ type: 'edt', exercise: h.exercise, muscle: h.muscle ?? muscleFor(h.exercise), at });
+  }
   return ev;
 }
 const recOf = (exercise, kind = 'edt', muscle = muscleFor(exercise)) => E.recoveryLeft(recEvents(), { exercise, muscle, kind }, recCfg(), now());
@@ -63,9 +69,12 @@ const best5Of = ex => E.bestForLimit(st.history, ex, REC_MIN, id => workoutById(
 const best5Html = ex => { const b = best5Of(ex); return `<span class="exbest">Rekord ${REC_MIN} min <b>${b ? b.total : '–'}</b></span>`; };
 const DAY_TIP = 'EDT über den Tag verteilen: z. B. morgens Liegestütze, mittags Kniebeugen, abends Klimmzüge. So trainiert jede Muskelgruppe erholt.';
 const causeText = r => r.cause ? (r.cause.type === 'test' ? `Fitnesstest ${esc(r.cause.exercise)} um ${hhmm(r.cause.at)}` : `EDT ${esc(r.cause.exercise)} bis ${hhmm(r.cause.at)}`) : '';
+// v1.7.0: mehrere Muskelgruppen gleichzeitig beobachten (Kombi); ein Eintrag bleibt ein Objekt wie bisher
+const recWatches = () => [].concat(st.settings.recWatch || []).filter(w => w && Number.isFinite(w.until));
 function watchRecovery(until, group) {
-  const cur = st.settings.recWatch;
-  st.settings.recWatch = cur && cur.until > until && cur.group === group ? cur : { until, group };
+  const list = recWatches(), cur = list.find(w => w.group === group);
+  if (cur) cur.until = Math.max(cur.until, until); else list.push({ until, group });
+  st.settings.recWatch = list.length === 1 ? list[0] : list;
   store.saveSettings(st.settings);
 }
 function notifyRow() {
@@ -94,8 +103,8 @@ function recTick() {
     if (l <= 0 && !el.classList.contains('over')) { el.classList.add('over'); ended = true; }
     if (el.textContent !== v) el.textContent = v;
   });
-  const w = st.settings.recWatch;
-  if (w && t >= w.until) { st.settings.recWatch = null; store.saveSettings(st.settings); recNotify(w.group); ended = true; }
+  const ws = recWatches(), due = ws.filter(w => t >= w.until);
+  if (due.length) { const rest = ws.filter(w => t < w.until); st.settings.recWatch = rest.length > 1 ? rest : rest[0] || null; store.saveSettings(st.settings); due.forEach(w => recNotify(w.group)); ended = true; }
   if (ended && ['home', 'plan', 'result', 'assess'].includes(st.view) && !(st.view === 'assess' && st.assess && ['lead', 'run', 'input'].includes(st.assess.step))) {
     if (st.view === 'plan' && st.sheet === 'rec') st.sheet = null;
     render();
@@ -168,6 +177,7 @@ function heroCard() {
   const d = new Date(now()), hasPlan = st.week.entries.length > 0;
   const list = hasPlan ? W.entriesOn(st.week, W.dayIdx(d)) : [], done = hasPlan ? W.doneOn(st.week, st.history, d, winfo) : new Set();
   const nx = hasPlan ? W.nextToday(st.week, st.history, d, winfo) : null, mins = d.getHours() * 60 + d.getMinutes();
+  if (nx && comboById(nx.workoutId)) return comboHero(comboById(nx.workoutId), `${toMin(nx.time) + 30 < mins ? 'Verpasst' : 'Als Nächstes'} · ${nx.time}`, list, done, nx, mins);
   let w = nx && workoutById(nx.workoutId), eyebrow;
   if (w) eyebrow = `${toMin(nx.time) + 30 < mins ? 'Verpasst' : 'Als Nächstes'} · ${nx.time}`;
   else {
@@ -177,10 +187,7 @@ function heroCard() {
   }
   if (!w) return `<button class="card2 nx empty" data-go="week"><b>Wochenplan anlegen</b><span>Einheiten über die Woche verteilen, mit Kalender-Erinnerung</span></button>`;
   const ph = tuneOf(w.exercise) ? phasesOf(w) : w.phases, b = bestOf(w.id), r = recOf(w.exercise, 'edt', w.muscle);
-  const rows = list.filter(e => !nx || e.id !== nx.id).map(e => { const i = winfo(e.workoutId); if (!i) return '';
-    const isDone = done.has(e.id), late = !isDone && toMin(e.time) + 30 < mins;
-    return `<div class="mr trow ${isDone ? 'done' : late ? 'late' : ''}" data-eid="${e.id}"><span class="tm tt">${e.time}</span><span class="nm" title="${esc(i.name)}">${esc(i.exercise)}</span>
-      ${isDone ? '<span class="st ok">✓ erledigt</span>' : `<button class="st ${late ? 'late' : 'lnk'}" data-act="plan-go" data-wid="${e.workoutId}">${late ? 'verpasst · ' : ''}Start ›</button>`}</div>`; }).join('');
+  const rows = heroRows(list, done, nx, mins);
   return `<div class="card2 nx" data-wid="${w.id}">
     <div class="eyebrow">${eyebrow}</div>
     <div class="hrow">${figureSvg(w.exercise, 'hfig')}<div class="hmain"><div class="hname">${esc(w.exercise)}</div><div class="hsub">${esc(w.name)}${b ? ` · Bestwert ${b.total}` : ''}</div></div></div>
@@ -191,11 +198,29 @@ function heroCard() {
     ${hasPlan ? weekDots() : `<button class="hplan" data-go="week">Wochenplan anlegen ›</button>`}
   </div>`;
 }
+function heroRows(list, done, nx, mins) {
+  return list.filter(e => !nx || e.id !== nx.id).map(e => { const i = winfo(e.workoutId); if (!i) return '';
+    const isDone = done.has(e.id), late = !isDone && toMin(e.time) + 30 < mins;
+    return `<div class="mr trow ${isDone ? 'done' : late ? 'late' : ''}" data-eid="${e.id}"><span class="tm tt">${e.time}</span><span class="nm" title="${esc(i.name)}">${esc(i.combo ? i.name : i.exercise)}</span>
+      ${isDone ? '<span class="st ok">✓ erledigt</span>' : `<button class="st ${late ? 'late' : 'lnk'}" data-act="plan-go" data-wid="${e.workoutId}">${late ? 'verpasst · ' : ''}Start ›</button>`}</div>`; }).join('');
+}
+function comboHero(c, eyebrow, list, done, nx, mins) {
+  const b = bestOf(c.id), rows = heroRows(list, done, nx, mins), rec = comboRec(c).filter(x => x.r.leftMs > 0);
+  return `<div class="card2 nx" data-cid="${c.id}">
+    <div class="eyebrow">${eyebrow}</div>
+    <div class="hrow">${figureSvg(c.steps[0].exercise, 'hfig')}<div class="hmain"><div class="hname">${esc(c.name)}</div><div class="hsub">Kombi · ${comboMode(c)}${b ? ` · Bestwert ${b.total}` : ''}</div></div></div>
+    <div class="phases hchips">${stepChips(c)}</div>
+    ${rec.map(x => `<div class="hrec">${esc(x.r.group)}: ${cd(x.r.until, 'Erholung noch ', 'erholt')}</div>`).join('')}
+    <button class="go" data-act="combo-start" data-cid="${c.id}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>Kombi starten</button>
+    ${rows ? `<div class="mini">${rows}</div>` : ''}
+    ${weekDots()}
+  </div>`;
+}
 function recentList() {
   const last = [...st.history].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 2);
   if (!last.length) return `<div class="card2 list"><p class="muted">Noch keine Einheiten.</p></div>`;
   return `<div class="card2 list">${last.map(h => { const b = bestOf(h.workoutId), pr = b && b.id === h.id, d = new Date(h.date);
-    return `<button class="lr" data-hist="${h.id}"><div><b>${esc(h.workoutName)}</b><small>${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} · ${h.sets.length} Sätze · ${de(h.perMin)}/min${h.aborted ? ' · abgebrochen' : ''}</small></div><span class="n ${pr ? 'pr' : ''}">${h.total}${pr ? '<span class="pr-tag">BEST</span>' : ''}</span></button>`; }).join('')}</div>`;
+    return `<button class="lr ${E.isCombo(h) ? 'lcombo' : ''}" data-hist="${h.id}"><div><b>${esc(h.workoutName)}${E.isCombo(h) ? '<span class="ktag">Kombi</span>' : ''}</b><small>${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })} · ${h.sets.length} Sätze · ${de(h.perMin)}/min${h.aborted ? ' · abgebrochen' : ''}</small></div><span class="n ${pr ? 'pr' : ''}">${h.total}${pr ? '<span class="pr-tag">BEST</span>' : ''}</span></button>`; }).join('')}</div>`;
 }
 function viewHome() {
   const open = openKey(), anim = st.panelAnim; st.panelAnim = false;
@@ -211,8 +236,9 @@ function viewHome() {
   <main class="scroll home">
     <section class="sec"><div class="sh"><h2>Heute</h2><button class="lk" data-go="week">Wochenplan ›</button></div>${heroCard()}</section>
     <section class="sec"><div class="sh"><h2>Übungen</h2><button class="lk" data-act="fitness" data-then="home">Fitnesstest ›</button></div><div class="extiles">${grid}</div></section>
+    <section class="sec kombi"><div class="sh"><h2>Kombi</h2>${st.combos.length ? '<button class="lk" data-act="combo-new" aria-label="Neue Kombi anlegen">+ Kombi</button>' : ''}</div>${comboList()}</section>
     <section class="sec"><div class="sh"><h2>Zuletzt</h2><button class="lk" data-go="history">Verlauf ›</button></div>${recentList()}</section>
-  </main>${tabs('home')}`;
+  </main>${tabs('home')}${comboEditSheet()}${comboRecSheet()}`;
 }
 // Auf-/Zuklappen der Übungs-Panels (eines offen); Animation nur ohne prefers-reduced-motion
 const reducedMotion = () => FX.reduced(); // v1.6.1: Einstellung „Animationen“ + System
@@ -225,8 +251,104 @@ function toggleEx(key) {
   if (el && cur === key && !reducedMotion()) { el.classList.add('closing'); el.addEventListener('animationend', apply, { once: true }); setTimeout(() => st.openEx === cur && apply(), 400); } else apply();
 }
 
+// ---------- Kombi-Training (v1.7.0): 2–4 Übungen im Wechsel, Bearbeiten im Sheet auf der Startseite ----------
+const saveCombos = () => store.saveCombos(st.combos);
+const comboMode = c => c.mode === 'rounds' ? `${c.rounds} ${c.rounds === 1 ? 'Runde' : 'Runden'}` : `${c.limitMin} min`;
+const stepChips = c => c.steps.map(x => `<span class="ph"><b>${x.reps}</b> ${esc(x.exercise)} · ${x.restSec} s</span>`).join('<span class="arr" aria-hidden="true">→</span>');
+/** Erholung je beteiligter Muskelgruppe (eine Zeile pro Gruppe, längste Restzeit). */
+function comboRec(c) {
+  const m = new Map();
+  for (const ex of E.comboExercises(c)) { const r = recOf(ex, 'edt'), cur = m.get(r.group); if (!cur || r.leftMs > cur.r.leftMs) m.set(r.group, { ex, r }); }
+  return [...m.values()];
+}
+function comboList() {
+  if (!st.combos.length) return `<div class="card2 cempty"><p class="muted">Noch keine Kombi. Mehrere Übungen abwechselnd in einer Einheit, z. B. Liegestütze und Klimmzüge mit kurzer Pause dazwischen.</p>
+    <button class="btn ghost wide" data-act="combo-new">Kombi anlegen</button></div>`;
+  return `<div class="combos">${st.combos.map(comboCard).join('')}</div>`;
+}
+function comboCard(c) {
+  const b = bestOf(c.id), rec = comboRec(c).filter(x => x.r.leftMs > 0);
+  return `<article class="card2 ccard" data-cid="${c.id}">
+    <div class="ch"><b class="cname">${esc(c.name)}</b><span class="dur">${comboMode(c)}</span></div>
+    <div class="phases csteps">${stepChips(c)}</div>
+    ${rec.map(x => `<span class="exrec wait">${esc(x.r.group)}: ${cd(x.r.until, 'Erholung noch ', 'erholt')}</span>`).join('')}
+    <div class="card-foot"><div class="best"><small>Bestwert</small><b>${b ? b.total : '–'}</b></div>
+      <button class="btn ghost" data-act="combo-edit" data-cid="${c.id}" aria-label="${esc(c.name)} bearbeiten">Bearbeiten</button>
+      <button class="btn primary" data-act="combo-start" data-cid="${c.id}" aria-label="${esc(c.name)} starten">Start</button></div>
+  </article>`;
+}
+function newCombo() {
+  const steps = ['Liegestütze', 'Klimmzüge'].map(ex => ({ exercise: ex, reps: E.comboReps(maxOf(ex)?.v), restSec: 20 }));
+  return { ...E.normalizeCombo({ id: uid('c'), name: 'Push & Pull', steps, mode: 'time', limitMin: 10, rounds: 5 }), isNew: true };
+}
+const cstepper = (f, i, v, unit, label) => `<div class="stepper"><button data-cst="${f}" data-ci="${i}" data-d="-1" aria-label="${label} weniger">−</button><output>${v}${unit ? `<small> ${unit}</small>` : ''}</output><button data-cst="${f}" data-ci="${i}" data-d="1" aria-label="${label} mehr">+</button></div>`;
+function comboEditSheet() {
+  if (st.sheet !== 'cedit' || !st.cdraft) return '';
+  const c = st.cdraft, anim = st.cAnim; st.cAnim = false;
+  const pl = E.comboPlan(c, ex => tempoOf(ex).spr);
+  const steps = c.steps.map((x, i) => { const mx = maxOf(x.exercise), n = i + 1;
+    return `<div class="cstep" data-ci="${i}"><div class="cstep-h"><b>Schritt ${n}</b><span></span>
+        ${i > 0 ? `<button class="icon sm" data-act="cstep-up" data-ci="${i}" aria-label="Schritt ${n} nach oben">↑</button>` : ''}
+        ${c.steps.length > E.COMBO_MIN_STEPS ? `<button class="icon sm" data-act="cstep-del" data-ci="${i}" aria-label="Schritt ${n} entfernen">✕</button>` : ''}</div>
+      <div class="chips cexs" role="radiogroup" aria-label="Übung für Schritt ${n}">${E.EXERCISES.map(ex => `<button class="chip ${ex === x.exercise ? 'on' : ''}" role="radio" aria-checked="${ex === x.exercise}" data-act="cstep-ex" data-ci="${i}" data-cex="${ex}">${ex}</button>`).join('')}</div>
+      <div class="cstep-v"><div class="cfield"><small>Wiederholungen</small>${cstepper('reps', i, x.reps, '', `Wiederholungen Schritt ${n}`)}</div><div class="cfield"><small>Pause danach</small>${cstepper('restSec', i, x.restSec, 's', `Pause Schritt ${n}`)}</div></div>
+      <p class="muted sm chint">${mx ? `Vorschlag ${E.comboReps(mx.v)} = 40 % von Max ${mx.v}` : 'Ohne Fitnesstest: Vorschlag 5'}</p></div>`; }).join('');
+  const limChips = [...new Set([...E.COMBO_LIMITS, ...(E.COMBO_LIMITS.includes(c.limitMin) ? [] : [c.limitMin])])].sort((a, b) => a - b);
+  const on = l => (l === 0 ? c.mode === 'rounds' : c.mode === 'time' && c.limitMin === l);
+  return `<div class="sheet-bg ${anim ? '' : 'noanim'}"><div class="sheet cedit ${anim ? '' : 'noanim'}" role="dialog" aria-label="Kombi bearbeiten">
+    <h3>${c.isNew ? 'Neue Kombi' : 'Kombi bearbeiten'}</h3>
+    <label class="cfield"><small>Name</small><input id="c-name" type="text" maxlength="60" value="${esc(c.name)}" placeholder="${esc(E.comboAutoName(c.steps))}" aria-label="Name der Kombi"></label>
+    ${steps}
+    ${c.steps.length < E.COMBO_MAX_STEPS ? `<button class="btn ghost wide sm" data-act="cstep-add">+ Schritt</button>` : ''}
+    <div class="cfield"><small>Dauer</small><div class="chips cmode" role="radiogroup" aria-label="Zeitlimit oder ohne Limit">${limChips.map(l => `<button class="chip ${on(l) ? 'on' : ''}" role="radio" aria-checked="${on(l)}" data-act="cmode" data-clim="${l}">${l} min</button>`).join('')}<button class="chip ${on(0) ? 'on' : ''}" role="radio" aria-checked="${on(0)}" data-act="cmode" data-clim="0">Ohne Limit</button></div></div>
+    ${c.mode === 'rounds' ? `<div class="prow"><span>Runden</span>${cstepper('rounds', -1, c.rounds, '', 'Runden')}</div>` : ''}
+    <p class="muted sm cplan">Runde ≈ ${fmt(pl.roundSec * 1000)} · ${c.mode === 'time' ? `≈ ${de(pl.rounds)} Runden in ${c.limitMin} min` : `Dauer ≈ ${fmt(pl.durSec * 1000)}`} (Tempo geschätzt)</p>
+    <button class="btn primary wide big" data-act="combo-save">Speichern</button>
+    ${c.isNew ? '' : '<button class="btn ghost wide danger" data-act="combo-del">Kombi löschen</button>'}
+    <button class="btn ghost wide" data-act="combo-cancel">Abbrechen</button>
+  </div></div>`;
+}
+function comboReduced(c) {
+  const steps = c.steps.map(x => { const r = recOf(x.exercise, 'edt'); return r.leftMs > 0 ? { ...x, reps: Math.max(1, Math.round(x.reps * cutOf(r).f)) } : { ...x }; });
+  const groups = comboRec(c).filter(x => x.r.leftMs > 0).map(x => ({ group: x.r.group, pct: cutOf(x.r).pct }));
+  return { steps, groups };
+}
+function comboRecSheet() {
+  if (st.sheet !== 'crec' || !st.crec) return '';
+  const c = comboById(st.crec); if (!c) return '';
+  const wait = comboRec(c).filter(x => x.r.leftMs > 0); if (!wait.length) return '';
+  const red = comboReduced(c), ch = c.steps.map((x, i) => x.reps !== red.steps[i].reps ? `${x.reps} → ${red.steps[i].reps} ${esc(x.exercise)}` : '').filter(Boolean);
+  return `<div class="sheet-bg"><div class="sheet recsheet crecsheet"><h3>Noch nicht erholt</h3>
+    <p>${wait.map(x => `${esc(x.r.group)}: ${causeText(x.r)}`).join('. ')}. Mit erschöpften Muskeln passen die Satzgrößen nicht.</p>
+    <div class="crecs">${wait.map(x => `<div class="recclock"><small>${esc(x.r.group)}</small><b>${cd(x.r.until, '', '0:00')}</b><small>ab ${hhmm(x.r.until)} Uhr</small></div>`).join('')}</div>
+    <button class="btn primary wide big" data-act="crec-wait">Warten</button>
+    <button class="btn ghost wide" data-act="crec-force">Trotzdem starten</button>
+    <p class="cutnote">Trotzdem starten: ${ch.length ? `${ch.join(', ')} Wdh.` : 'Satzgrößen unverändert'} nur für diese Einheit.</p>
+    <p class="tip"><b>Oder später am Tag trainieren.</b> ${DAY_TIP}</p>
+  </div></div>`;
+}
+function comboStart(id, force = false) {
+  const c = comboById(id); if (!c) return;
+  const wait = comboRec(c).filter(x => x.r.leftMs > 0);
+  if (wait.length && !force) { st.crec = id; st.sheet = 'crec'; return st.view === 'home' ? render() : go('home'); }
+  const run = E.comboWorkout(c); let shortRec = null;
+  if (force && wait.length) {
+    const red = comboReduced(c); run.combo.steps = red.steps; run.phases[0].reps = red.steps[0].reps;
+    shortRec = { pct: Math.max(...red.groups.map(g => g.pct)), groups: red.groups, group: red.groups.map(g => g.group).join(' + ') };
+  }
+  st.crec = null; st.sheet = null; startWorkout(run, shortRec);
+}
+function comboSave() {
+  const n = $('#c-name'); if (n) st.cdraft.name = n.value;
+  const { isNew, ...raw } = st.cdraft, c = E.normalizeCombo(raw), i = st.combos.findIndex(x => x.id === c.id);
+  if (i >= 0) st.combos[i] = c; else st.combos.push(c);
+  saveCombos(); st.cdraft = null; st.sheet = null; toast(isNew ? 'Kombi angelegt' : 'Gespeichert'); render();
+}
+
 // ---------- Wochenplan ----------
-const winfo = id => { const w = workoutById(id); return w && { name: w.name, exercise: w.exercise, muscle: w.muscle, limitMin: w.limitMin }; };
+const winfo = id => { const w = workoutById(id); if (w) return { name: w.name, exercise: w.exercise, muscle: w.muscle, limitMin: w.limitMin };
+  const c = comboById(id); // v1.7.0 Kombi im Wochenplan: Dauer = Zeitlimit bzw. geschätzt
+  return c && { name: c.name, exercise: 'Kombi', exercises: E.comboExercises(c), combo: true, limitMin: c.mode === 'time' ? c.limitMin : Math.max(1, Math.ceil(E.comboPlan(c, ex => tempoOf(ex).spr).durSec / 60)) }; };
 const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const ymdL = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 function saveWeek() { store.savePlan(st.week); }
@@ -236,7 +358,8 @@ function weekStrip() {
 }
 function viewWeek() {
   const conf = W.planConflicts(st.week, winfo, recCfg()), byId = Object.fromEntries(st.week.entries.map(e => [e.id, e]));
-  const opts = sel => st.workouts.map(w => `<option value="${w.id}" ${w.id === sel ? 'selected' : ''}>${esc(w.name)}</option>`).join('');
+  const opts = sel => st.workouts.map(w => `<option value="${w.id}" ${w.id === sel ? 'selected' : ''}>${esc(w.name)}</option>`).join('')
+    + (st.combos.length ? `<optgroup label="Kombi">${st.combos.map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>Kombi: ${esc(c.name)}</option>`).join('')}</optgroup>` : '');
   const changed = st.week.exportedSig && st.week.exportedSig !== W.planSig(st.week);
   const days = W.DAYS_LONG.map((name, d) => {
     const list = W.entriesOn(st.week, d), cf = conf.filter(c => c.day === d);
@@ -279,7 +402,7 @@ function weekSheet() {
 function weekAdd(day) {
   const list = W.entriesOn(st.week, day), last = list.at(-1);
   const time = last ? `${String(Math.min(21, Math.floor(toMin(last.time) / 60) + 4)).padStart(2, '0')}:00` : '08:00';
-  const used = list.map(e => winfo(e.workoutId)).filter(Boolean).map(i => E.musclesOf(i.exercise, i.muscle));
+  const used = list.map(e => winfo(e.workoutId)).filter(Boolean).map(W.musclesOfInfo);
   const w = st.workouts.find(x => !used.some(u => E.overlaps(u, E.musclesOf(x.exercise, x.muscle)))) || st.workouts[0];
   if (!w) return;
   st.week.entries.push({ id: W.newId(), day, time, workoutId: w.id }); saveWeek();
@@ -312,8 +435,9 @@ function remindTick() {
       if (at == null || mins < at || mins >= at + 3) continue;
       const key = `${ymdL(d)}|${e.id}|${kind}`; if (fired.includes(key)) continue;
       fired.push(key); if (fired.length > 60) fired.splice(0, fired.length - 60); store.saveSettings(st.settings);
-      const msg = kind === 'pre' ? `In ${st.week.alarmBefore} min: ${e.time} ${i.exercise}` : `Jetzt: ${i.exercise} (${i.name})`;
-      toast(msg); A.cue.alert(); A.say(kind === 'pre' ? `In ${st.week.alarmBefore} Minuten ${i.exercise}` : `Zeit für ${i.exercise}`);
+      const what = i.combo ? `Kombi ${i.name}` : i.exercise;
+      const msg = kind === 'pre' ? `In ${st.week.alarmBefore} min: ${e.time} ${what}` : i.combo ? `Jetzt: ${what}` : `Jetzt: ${i.exercise} (${i.name})`;
+      toast(msg); A.cue.alert(); A.say(kind === 'pre' ? `In ${st.week.alarmBefore} Minuten ${what}` : `Zeit für ${what}`);
       if ('Notification' in window && Notification.permission === 'granted') {
         const url = `./?w=${encodeURIComponent(e.workoutId)}`;
         navigator.serviceWorker?.getRegistration?.().then(r => r ? r.showNotification('EDT Timer', { body: msg, tag: 'edt-' + e.id, data: { url } }) : new Notification('EDT Timer', { body: msg })).catch(() => {});
@@ -626,6 +750,7 @@ function beginSession() {
   handle(events); store.saveActive(state);
 }
 function phaseMarks(s) {
+  if (s.combo) return '';
   const tl = E.phaseTimeline(s, s.spr || E.secPerRepFor(s.exercise), now());
   return tl.slice(1).filter(o => o.reached).map(o => `<span class="mk" style="left:${(100 * o.start / s.limitMs).toFixed(2)}%"></span>`).join('');
 }
@@ -635,16 +760,23 @@ function phaseStrip(s) {
   return `<div class="pstrip">${tl.map(o => `<span class="${o.idx === s.phaseIdx ? 'on' : ''} ${o.reached ? '' : 'off'}">P${o.idx + 1} ${o.reached ? `${E.mmss(o.start)}–${E.mmss(o.end)}` : '–'}</span>`).join('')}</div>`;
 }
 function posText(s) {
+  if (s.combo) { const c = s.combo; return `Runde ${s.cRound}${c.rounds ? '/' + c.rounds : ''} · Schritt ${s.stepIdx + 1}/${c.steps.length} · gesamt ${s.setNo}`; }
   const p = s.phases[s.phaseIdx];
   return `Phase ${s.phaseIdx + 1}/${s.phases.length} · Satz ${s.round}${p.rounds ? '/' + p.rounds : ''} · gesamt ${s.setNo}`;
 }
+const leadText = w => w.combo ? `Kombi · ${w.combo.rounds ? `${w.combo.rounds} Runden` : `${w.limitMin} min`} · zuerst ${w.combo.steps[0].reps} ${esc(w.combo.steps[0].exercise)}`
+  : `${esc(w.exercise)} · ${w.limitMin} min · Ziel ${w.phases[0].reps} Wdh.`;
+// Kombi: aktueller Schritt groß, darunter der folgende (am Ende der letzten Runde: „Ende“)
+const comboNext = s => { const c = s.combo, last = c.rounds && s.cRound >= c.rounds && s.stepIdx === c.steps.length - 1; return last ? null : c.steps[(s.stepIdx + 1) % c.steps.length]; };
+const clockText = (s, t) => s.limitMs ? fmt(s.endsAt - t) : fmt(t - s.startedAt);
+const barFrac = (s, t) => s.limitMs ? Math.min(1, (t - s.startedAt) / s.limitMs) : Math.min(1, s.sets.length / (s.combo.rounds * s.combo.steps.length));
 function viewTrain() {
   const s = st.session;
   if (st.lead) return `<div class="train lead"><header class="ttop"><button class="icon" data-act="cancel-lead" aria-label="Abbrechen">✕</button><div class="tname">${esc(st.lead.workout.name)}</div><span></span></header>
-    <div class="leadbox"><div class="lbl">Gleich geht's los</div><div id="t-lead" class="leadnum">${st.settings.leadIn}</div><div class="lbl">${esc(st.lead.workout.exercise)} · ${st.lead.workout.limitMin} min · Ziel ${st.lead.workout.phases[0].reps} Wdh.</div>${st.lead.shortRec ? `<div class="srbadge">Verkürzte Erholung · Sätze −${st.lead.shortRec.pct} %</div>` : ''}</div></div>`;
+    <div class="leadbox"><div class="lbl">Gleich geht's los</div><div id="t-lead" class="leadnum">${st.settings.leadIn}</div><div class="lbl">${leadText(st.lead.workout)}</div>${st.lead.shortRec ? `<div class="srbadge">Verkürzte Erholung · Sätze −${st.lead.shortRec.pct} %</div>` : ''}</div></div>`;
   const tap = s.countMode === 'tap', next = s.phases[s.phaseIdx];
   const top = `<header class="ttop"><button class="icon" data-act="quit" aria-label="Beenden">✕</button><div class="tname">${esc(s.workoutName)}</div><button class="icon" data-act="mute" aria-label="Ton">${st.settings.sound ? '🔊' : '🔇'}</button></header>
-    <section class="clock"><div id="t-clock" class="bigclock">${fmt(s.endsAt - now())}</div><div class="bar"><i id="t-bar"></i>${phaseMarks(s)}</div>${phaseStrip(s)}</section>
+    <section class="clock"><div id="t-clock" class="bigclock" ${s.limitMs ? '' : 'aria-label="Dauer bisher"'}>${clockText(s, now())}</div><div class="bar"><i id="t-bar"></i>${phaseMarks(s)}</div>${phaseStrip(s)}</section>
     <section class="stats2"><div class="stat smain"><div id="t-total" class="num">${E.total(s)}</div><div class="lbl">Wdh. gesamt</div></div>
       <div class="sside"><div class="stat"><span class="lbl">vs. Bestwert</span><span id="t-vs" class="num sm">–</span></div>
       ${s.sets.length >= 2 ? `<div class="stat"><span class="lbl">Hochrechnung</span><span id="t-proj" class="num sm">–</span></div>` : ''}</div></section>
@@ -655,6 +787,10 @@ function viewTrain() {
       ? `<section class="work"><div class="lbl">Satz ${s.setNo} · Ziel ${s.target} Wdh.</div><div class="reps"><span id="t-tap">${s.tapCount}</span><small>/${s.target}</small></div>
           <button class="btn ghost" data-act="tap-done">Satz beenden (Teilsatz)</button></section>
          <button class="hit tap" data-act="tap"><span>TIPPEN</span><small>jedes Tippen = 1 Wiederholung</small></button>`
+      : s.combo ? `<section class="work cwork"><div class="cex" aria-live="polite"><b>${s.target}</b> ${esc(s.combo.steps[s.stepIdx].exercise)}</div><div class="lbl">tatsächlich geschafft:</div>
+          <div class="adj"><button class="round" data-act="minus" aria-label="minus">−</button><div id="t-reps" class="reps ${st.adj < s.target ? 'less' : ''}">${st.adj}</div><button class="round" data-act="plus" aria-label="plus">+</button></div>
+          <div class="cnext">${comboNext(s) ? `Danach: <b>${comboNext(s).reps} ${esc(comboNext(s).exercise)}</b> · ${s.combo.steps[s.stepIdx].restSec} s Pause dazwischen` : 'Letzter Satz'}</div></section>
+         <button class="hit" data-act="done"><svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor"/></svg><span>Satz geschafft</span></button>`
       : `<section class="work"><div class="lbl">Ziel <b>${s.target}</b> Wdh. · tatsächlich geschafft:</div>
           <div class="adj"><button class="round" data-act="minus" aria-label="minus">−</button><div id="t-reps" class="reps ${st.adj < s.target ? 'less' : ''}">${st.adj}</div><button class="round" data-act="plus" aria-label="plus">+</button></div></section>
          <button class="hit" data-act="done"><svg viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill="currentColor"/></svg><span>Satz geschafft</span></button>`;
@@ -662,7 +798,7 @@ function viewTrain() {
     const last = s.sets.at(-1);
     body = `<section class="rest"><div class="ringbox"><div class="ringwrap"><svg class="ring" viewBox="0 0 200 200"><circle cx="100" cy="100" r="88" class="rbg"/><circle id="t-ring" cx="100" cy="100" r="88" class="rfg" pathLength="1000"/></svg>
         <div class="ring-in"><div id="t-rest" class="restnum">${Math.ceil((s.restEndsAt - now()) / 1000)}</div><div class="lbl">Pause</div></div></div></div>
-        <div class="next">Als Nächstes: <b>${s.target} Wdh.</b>${s.pendingPhase ? `<span class="badge">${phaseBadge(s)}</span>` : ''}</div></section>
+        <div class="next">Als Nächstes: <b>${s.combo ? `${s.target} ${esc(s.combo.steps[s.stepIdx].exercise)}` : `${s.target} Wdh.`}</b>${s.pendingPhase ? `<span class="badge">${phaseBadge(s)}</span>` : ''}${s.combo && comboNext(s) ? `<small class="cthen">danach ${comboNext(s).reps} ${esc(comboNext(s).exercise)}</small>` : ''}</div></section>
       <div class="restbar compact"><div class="rc">${last && !last.partial ? `<div class="rate"><span>Satz ${last.n}</span><div class="seg">${[['ok', 'geschafft'], ['hard', 'knapp'], ['fail', 'nicht geschafft']].map(([v, l]) => `<button data-rate="${v}" class="r-${v} ${E.rateOf(last) === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>` : ''}
         <div class="last"><span>Letzter Satz</span><span class="lastadj"><button class="round sm" data-act="last-minus" aria-label="minus">−</button><b id="t-last">${last ? last.done : 0}</b><button class="round sm" data-act="last-plus" aria-label="plus">+</button></span></div></div>
         <button class="btn ghost wide" data-act="skip">Pause überspringen</button></div>`;
@@ -675,7 +811,7 @@ function sheetHtml() {
     const max = Math.max(s.target, s.tapCount);
     const nums = max <= 24 ? `<div class="numgrid">${Array.from({ length: max + 1 }, (_, i) => `<button data-pv="${i}" class="${st.partialVal === i ? 'on' : ''}">${i}</button>`).join('')}</div>`
       : `<div class="adj"><button class="round" data-act="pv-minus">−</button><div class="reps">${st.partialVal}</div><button class="round" data-act="pv-plus">+</button></div>`;
-    return `<div class="sheet-bg"><div class="sheet"><h3>Zeit abgelaufen</h3><p>Wie viele Wiederholungen hast du im letzten Satz geschafft? (Ziel ${s.target})</p>${nums}
+    return `<div class="sheet-bg"><div class="sheet"><h3>Zeit abgelaufen</h3><p>Wie viele Wiederholungen hast du im letzten Satz geschafft? (Ziel ${s.target}${s.combo ? ' ' + esc(s.combo.steps[s.stepIdx].exercise) : ''})</p>${nums}
       <button class="btn primary wide big" data-act="partial-ok">Speichern · ${st.partialVal} Wdh.</button></div></div>`;
   }
   if (st.sheet === 'quit') return `<div class="sheet-bg"><div class="sheet"><h3>Training beenden?</h3><p>Bisher ${E.total(s)} Wdh. in ${s.sets.length} Sätzen.</p>
@@ -694,7 +830,7 @@ function phaseSpeech(ph) {
     : ph.reps !== ph.prevReps ? `Neue Phase: ${ph.reps} Wiederholungen` : `Neue Phase: ${ph.restSec} Sekunden Pause`;
 }
 function restSpeech(e, s) {
-  const next = `Nächster Satz: ${e.nextTarget} ${s?.exercise || 'Wiederholungen'}`;
+  const next = `Nächster Satz: ${e.nextTarget} ${e.nextEx || s?.exercise || 'Wiederholungen'}`;
   return e.sec >= 6 ? `Pause ${e.sec} Sekunden. ${next}` : next;
 }
 function handle(events) {
@@ -702,7 +838,7 @@ function handle(events) {
   const s = st.session; let adapted = null;
   for (const e of events) {
     switch (e.type) {
-      case 'go': st.adj = e.target; A.cue.go(); A.say(e.phase ? 'Los! ' + phaseSpeech(e.phase) : 'Los'); break;
+      case 'go': st.adj = e.target; A.cue.go(); A.say(e.ex ? `Los: ${e.target} ${e.ex}` : e.phase ? 'Los! ' + phaseSpeech(e.phase) : 'Los'); break;
       case 'set': A.cue.set(); break;
       case 'adapt': adapted = e; break;
       case 'rest': if (e.sec > 0) A.say(restSpeech(e, s)); break; // v1.6.3: nächste Übung + Wiederholungen ansagen
@@ -721,6 +857,7 @@ function finishSession(discard = false) {
   const s = st.session; st.session = null; st.sheet = null; store.saveActive(null); A.keepAwake(false);
   if (discard || !s) { go('home'); return; }
   const sum = E.summary(s), prevBest = bestOf(s.workoutId);
+  if (s.combo) return finishCombo(s, sum, prevBest);
   const entry = { id: uid('s'), workoutId: s.workoutId, workoutName: s.workoutName, exercise: s.exercise, date: new Date(s.startedAt).toISOString(),
     limitMs: s.limitMs, total: sum.total, sets: s.sets, phases: s.phases, spr: s.spr, elapsedMs: sum.elapsedMs, aborted: sum.aborted, perMin: sum.perMin,
     prevBest: prevBest ? prevBest.total : null, muscle: s.muscle, shortRec: s.shortRec || null };
@@ -729,6 +866,17 @@ function finishSession(discard = false) {
   st.result = entry; st.resultFrom = 'home'; go('result');
 }
 
+// v1.7.0: ein Verlaufseintrag pro Kombi-Einheit; exercise bleibt leer, damit Einzel-Rekorde und Tempo unberührt bleiben
+function finishCombo(s, sum, prevBest) {
+  const c = s.combo, perEx = E.comboTotals(s.sets, c.steps), exercises = Object.keys(perEx);
+  const entry = { id: uid('s'), type: 'combo', comboId: s.workoutId, workoutId: s.workoutId, workoutName: s.workoutName, name: s.workoutName, exercise: null, exercises,
+    date: new Date(s.startedAt).toISOString(), mode: c.rounds ? 'rounds' : 'time', limitMs: s.limitMs || null, rounds: c.rounds,
+    roundsDone: s.sets.filter(x => x.step === c.steps.length - 1 && !x.partial).length, total: sum.total, perEx, steps: c.steps, sets: s.sets, phases: s.phases,
+    elapsedMs: sum.elapsedMs, aborted: sum.aborted, perMin: sum.perMin, prevBest: prevBest ? prevBest.total : null, shortRec: s.shortRec || null };
+  st.history.push(entry); store.saveHistory(st.history);
+  if (entry.total > 0) for (const ex of exercises) if (perEx[ex] > 0) { const r = recOf(ex, 'edt'); if (r.leftMs > 0) watchRecovery(r.until, r.group); }
+  st.result = entry; st.resultFrom = 'home'; go('result');
+}
 function frameAssess() {
   const a = st.assess; if (!a) return; const t = now();
   if (a.step === 'lead') {
@@ -756,8 +904,8 @@ function frame() {
   const key = `${s.status}|${s.setNo}|${st.sheet}`;
   if (key !== st.layoutKey) { st.layoutKey = key; render(); }
   const set = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== String(v)) el.textContent = v; };
-  set('t-clock', fmt(s.endsAt - t));
-  const bar = $('#t-bar'); if (bar) bar.style.transform = `scaleX(${Math.min(1, (t - s.startedAt) / s.limitMs)})`;
+  set('t-clock', clockText(s, t));
+  const bar = $('#t-bar'); if (bar) bar.style.transform = `scaleX(${barFrac(s, t)})`;
   const tot = E.total(s); set('t-total', tot); set('t-tap', s.tapCount);
   const pr = E.projection(s, t); set('t-proj', pr ?? '–');
   const best = bestOf(s.workoutId);
@@ -787,8 +935,41 @@ function barChart(sets) {
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Wiederholungen pro Satz"><text x="0" y="${y(maxV) + 4}" class="ax l">${maxV}</text><line class="base" x1="${pad}" x2="${W}" y1="${H - pad}" y2="${H - pad}"/>${bars}</svg>
     <div class="legend"><span><i class="full"></i>geschafft</span><span><i class="hard"></i>knapp</span><span><i class="miss"></i>nicht geschafft</span><span><i class="partial"></i>Teilsatz</span><span><i class="tgl"></i>Ziel</span></div>`;
 }
+function viewComboResult(r, isNew) {
+  const best = bestOf(r.workoutId), pr = !r.aborted && r.total > 0 && (r.prevBest == null || r.total > r.prevBest);
+  const full = r.sets.filter(x => x.done >= x.target).length, d = new Date(r.date), c = comboById(r.comboId);
+  const per = Object.entries(r.perEx || {});
+  return `<header class="top"><button class="icon" data-go="${isNew ? 'home' : 'history'}" aria-label="Zurück">‹</button><h2>Ergebnis</h2><span></span></header>
+  <main class="scroll">
+    <section class="hero ${pr ? 'pr' : ''}">
+      ${pr ? '<div class="badge big">Neuer Bestwert</div>' : ''}
+      <div class="huge">${r.total}</div><div class="lbl">Wiederholungen gesamt · Kombi</div>
+      <div class="sub">${esc(r.workoutName)} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}${r.aborted ? ' · abgebrochen' : ''}</div>
+      ${!pr && best ? `<div class="sub">Bestwert ${best.total}${best.id !== r.id ? ` (${r.total - best.total >= 0 ? '+' : ''}${r.total - best.total})` : ''}</div>` : ''}
+    </section>
+    <section class="ctot" aria-label="Wiederholungen je Übung">${per.map(([ex, n]) => `<div data-cex="${esc(ex)}"><b>${n}</b><small>${esc(ex)}</small></div>`).join('')}<div class="sum"><b>${r.total}</b><small>Gesamt</small></div></section>
+    <section class="grid3"><div><b>${r.sets.length}</b><small>Sätze (${full} voll)</small></div><div><b>${r.roundsDone ?? 0}</b><small>Runden${r.rounds ? ` von ${r.rounds}` : ''}</small></div><div><b>${fmt(r.elapsedMs)}</b><small>Dauer</small></div></section>
+    ${r.shortRec ? `<div class="recbox wait"><b>Verkürzte Erholung</b>: Satzgrößen bis −${r.shortRec.pct} %.</div>` : ''}
+    ${isNew ? comboRecCard(r) : ''}
+    <p class="muted sm cnote">Kombi-Einheiten zählen nicht für Rekorde und Bestwerte der einzelnen Übungen.</p>
+    <h3 class="h3">Wiederholungen pro Satz</h3>
+    <div class="panel">${barChart(r.sets)}</div>
+    <div class="row-actions">
+      ${c ? `<button class="btn primary big" data-act="combo-start" data-cid="${c.id}">Nochmal</button>` : ''}
+      ${isNew ? `<button class="btn ghost big" data-go="history">Zum Verlauf</button>` : `<button class="btn ghost danger" data-act="delsession">Eintrag löschen</button>`}
+    </div>
+  </main>`;
+}
+function comboRecCard(r) {
+  if (!(r.total > 0)) return '';
+  const seen = new Set(), rows = [];
+  for (const ex of r.exercises || []) { const rr = recOf(ex, 'edt'); if (seen.has(rr.group)) continue; seen.add(rr.group);
+    rows.push(rr.leftMs > 0 ? `<p class="nx">Nächstes EDT für ${esc(rr.group)} ab <b>${hhmm(rr.until)} Uhr</b> <span class="muted">(${cd(rr.until, 'noch ', 'erholt')})</span></p>` : `<p class="nx">${esc(rr.group)} erholt.</p>`); }
+  return `<div class="panel nextrec crec"><div class="panel-h"><span>Erholung</span><span>${seen.size} ${seen.size === 1 ? 'Muskelgruppe' : 'Muskelgruppen'}</span></div>${rows.join('')}</div>`;
+}
 function viewResult() {
   const r = st.result, isNew = st.resultFrom === 'home';
+  if (E.isCombo(r)) return viewComboResult(r, isNew);
   const best = bestOf(r.workoutId);
   const pr = !r.aborted && r.total > 0 && (r.prevBest == null || r.total > r.prevBest);
   const full = r.sets.filter(x => x.done >= x.target).length;
@@ -888,11 +1069,15 @@ function lineChart(list) {
 }
 // Entwicklung · 30 Tage: nur Einheiten mit gleicher Zeitvorgabe (Dauer-Auswahl), je Tag die beste Einheit (bei „Alle“ Summe des Tages)
 const ddmm = t => { const d = new Date(t); return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`; };
+// v1.7.0 Umschalter Regulär | Kombi | Gesamt: Regulär = nur Einzel-EDT (wie bisher), Kombi = nur Kombi-Einheiten
+// (Übungsfilter = Wdh. dieser Übung innerhalb der Kombis), Gesamt = beide Methoden, Summe je Tag, Dauer egal.
+const DEV_MODES = [['reg', 'Regulär'], ['combo', 'Kombi'], ['all', 'Gesamt']];
+const DEV_EMPTY = { reg: 'Noch keine Einheiten in den letzten 30 Tagen', combo: 'Noch keine Kombi-Einheiten in den letzten 30 Tagen', all: 'Noch keine Einzel- oder Kombi-Einheiten in den letzten 30 Tagen' };
 function devData(exSel) {
-  return E.devSeries(st.history, st.maxes, { exercise: exSel, limitMin: st.devLim ?? null, now: now(), days: 30, info: id => workoutById(id) });
+  return E.devSeries(st.history, st.maxes, { exercise: exSel, limitMin: st.devLim ?? null, now: now(), days: 30, info: id => workoutById(id), mode: st.devMode });
 }
 function devChart(sr, exSel, anim) {
-  if (!sr.points.length) return `<p class="muted devempty">Noch keine Einheiten in den letzten 30 Tagen</p>`;
+  if (!sr.points.length) return `<p class="muted devempty">${DEV_EMPTY[sr.mode] || DEV_EMPTY.reg}</p>`;
   const W = 340, H = 190, pl = 30, pr = sr.tests.length ? 28 : 10, pt = 12, pb = 24, DAY = 86400000;
   const vals = sr.points.map(p => p.value).concat(sr.trend.map(p => p.value));
   let lo = Math.min(...vals), hi = Math.max(...vals); const pad = Math.max(2, (hi - lo) * 0.12); lo = Math.max(0, lo - pad); hi += pad;
@@ -906,7 +1091,7 @@ function devChart(sr, exSel, anim) {
   const len = Math.ceil(xy.slice(1).reduce((a, q, i) => a + Math.hypot(q[0] - xy[i][0], q[1] - xy[i][1]), 0)) + 1;
   const path = xy.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`).join('');
   const trend = sr.trend.length >= 2 ? `<path class="tr" d="${sr.trend.map((p, i) => `${i ? 'L' : 'M'}${x(p.day).toFixed(1)},${y(p.value).toFixed(1)}`).join('')}"/>` : '';
-  return `<svg class="devc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Wiederholungen pro Einheit, letzte 30 Tage">
+  return `<svg class="devc" data-mode="${sr.mode}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${sr.mode === 'reg' ? 'Wiederholungen pro Einheit' : sr.mode === 'combo' ? 'Kombi-Wiederholungen' : 'Wiederholungen gesamt pro Tag'}, letzte 30 Tage">
     ${yt.map(v => `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${pl - 5}" y="${y(v) + 3.5}" text-anchor="end">${v}</text>`).join('')}
     ${ty ? tt.map(v => `<text class="ax r" x="${W - pr + 5}" y="${ty(v) + 3.5}">${v}</text>`).join('') : ''}
     ${xt.map((t, i) => `<text class="ax" x="${x(t)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}">${ddmm(t)}</text>`).join('')}
@@ -920,25 +1105,29 @@ function devChart(sr, exSel, anim) {
 function devInfo(sr, i) {
   const p = sr.points[i]; if (!p) return '';
   const names = [...new Set(p.sessions.map(x => x.name))].map(esc).join(', ');
-  const more = p.sessions.length > 1 ? (st.devEx === null ? ` · Summe aus ${p.sessions.length} Einheiten` : ` · beste von ${p.sessions.length} Einheiten`) : '';
+  const more = p.sessions.length > 1 ? (sr.sum ? ` · Summe aus ${p.sessions.length} Einheiten` : ` · beste von ${p.sessions.length} Einheiten`) : '';
   return `<b>${new Date(p.day).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}</b> · <b>${p.value}</b> Wdh. · ${names}${more}`;
 }
 function devPanel(defEx) {
-  const exList = [...new Set([...E.EXERCISES, ...st.history.map(h => h.exercise).filter(Boolean)])];
-  const exSel = st.devEx === undefined ? defEx : st.devEx;
+  const mode = st.devMode || 'reg';
+  const exList = mode === 'combo' ? [...E.EXERCISES] : [...new Set([...E.EXERCISES, ...st.history.map(h => h.exercise).filter(Boolean)])];
+  let exSel = st.devEx === undefined ? defEx : st.devEx;
+  if (exSel != null && !exList.includes(exSel)) exSel = null;
   const sr = devData(exSel), anim = st.devAnim && !reducedMotion(); st.devAnim = false;
   st.devSr = sr; if (st.devPt != null && !sr.points[st.devPt]) st.devPt = null;
   const sm = sr.summary, pct = sm ? sm.pct : null;
   const sum = !sr.points.length ? '' : sm
-    ? `<p class="devsum ${pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'}">${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)} % Wdh. ggü. erster Woche <span class="muted">(Ø ${Math.round(sm.first)} → ${Math.round(sm.last)}${exSel == null ? ' pro Tag' : ''})</span></p>`
-    : `<p class="devsum flat">Wochenvergleich ab zwei Wochen mit Einheiten</p>`;
-  return `<div class="panel dev"><div class="panel-h"><span>Entwicklung · 30 Tage</span>${sr.limitMin ? `<span>${sr.limitMin}-min-Einheiten</span>` : ''}</div>
+    ? `<p class="devsum ${pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat'}">${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct)} % ${mode === 'combo' ? 'Kombi-Wdh.' : mode === 'all' ? 'Wdh. gesamt' : 'Wdh.'} ggü. erster Woche <span class="muted">(Ø ${Math.round(sm.first)} → ${Math.round(sm.last)}${sr.sum ? ' pro Tag' : ''})</span></p>`
+    : `<p class="devsum flat">Wochenvergleich ab zwei Wochen mit ${mode === 'combo' ? 'Kombi-Einheiten' : 'Einheiten'}</p>`;
+  const limLabel = mode === 'all' ? 'alle Dauern' : sr.limitMin ? `${sr.limitMin}-min-${mode === 'combo' ? 'Kombis' : 'Einheiten'}` : mode === 'combo' && sr.limitMin === 0 ? 'Kombis ohne Limit' : '';
+  return `<div class="panel dev"><div class="panel-h"><span>Entwicklung · 30 Tage</span>${limLabel ? `<span>${limLabel}</span>` : ''}</div>
+    <div class="chips devmode" role="radiogroup" aria-label="Trainingsart im Diagramm">${DEV_MODES.map(([v, l]) => `<button class="chip ${mode === v ? 'on' : ''}" role="radio" aria-checked="${mode === v}" data-dmode="${v}">${l}</button>`).join('')}</div>
     <div class="chips scrollx devex"><button class="chip ${exSel == null ? 'on' : ''}" data-dex="__all">Alle</button>${exList.map(ex => `<button class="chip ${ex === exSel ? 'on' : ''}" data-dex="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
-    ${sr.limits.length > 1 ? `<div class="chips devlim">${sr.limits.slice().sort((a, b) => a - b).map(l => `<button class="chip ${l === sr.limitMin ? 'on' : ''}" data-dlim="${l}">${l} min</button>`).join('')}</div>` : ''}
+    ${sr.limits.length > 1 ? `<div class="chips devlim">${sr.limits.slice().sort((a, b) => (a || 1e9) - (b || 1e9)).map(l => `<button class="chip ${l === sr.limitMin ? 'on' : ''}" data-dlim="${l}">${l ? `${l} min` : 'Ohne Limit'}</button>`).join('')}</div>` : ''}
     ${devChart(sr, exSel, anim)}
-    ${sr.points.length ? `<div class="legend"><span><i class="wll"></i>${exSel == null ? 'Wdh. pro Tag (Summe)' : 'Wdh. pro Einheit'}</span>${sr.trend.length >= 2 ? '<span><i class="trl"></i>Trend (Ø 3)</span>' : ''}${sr.tests.length ? '<span><i class="tml"></i>Fitnesstest (rechte Achse)</span>' : ''}</div>
+    ${sr.points.length ? `<div class="legend"><span><i class="wll"></i>${sr.sum ? (mode === 'all' ? 'Wdh. pro Tag (Summe, Einzel + Kombi)' : 'Wdh. pro Tag (Summe)') : mode === 'combo' ? `${esc(exSel)} pro Kombi-Einheit` : 'Wdh. pro Einheit'}</span>${sr.trend.length >= 2 ? '<span><i class="trl"></i>Trend (Ø 3)</span>' : ''}${sr.tests.length ? '<span><i class="tml"></i>Fitnesstest (rechte Achse)</span>' : ''}</div>
     <div class="devinfo ${st.devPt == null ? 'hint' : ''}" id="devinfo">${st.devPt == null ? 'Punkt antippen: Datum, Wiederholungen, Workout' : devInfo(sr, st.devPt)}</div>` : ''}
-    ${sum}</div>`;
+    ${sum}${mode === 'all' ? '<p class="muted sm devnote">Gesamt: Einzel- und Kombi-Einheiten aller Dauern, Wiederholungen je Tag addiert.</p>' : ''}</div>`;
 }
 function selectDevPoint(i) {
   st.devPt = i; const inf = $('#devinfo'); if (!inf || !st.devSr) return;
@@ -954,7 +1143,7 @@ function viewHistory() {
   const best = f ? bestOf(f) : null;
   const items = [...st.history].reverse().map(h => {
     const d = new Date(h.date);
-    return `<button class="hitem" data-hist="${h.id}"><div><b>${esc(h.workoutName)}</b><small>${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })} · ${h.sets.length} Sätze · ${de(h.perMin)}/min${h.aborted ? ' · abgebrochen' : ''}</small></div><div class="htot ${best && h.id === best.id ? 'pr' : ''}">${h.total}</div></button>`;
+    return `<button class="hitem" data-hist="${h.id}"><div><b>${esc(h.workoutName)}${E.isCombo(h) ? '<span class="ktag">Kombi</span>' : ''}</b><small>${d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })} · ${h.sets.length} Sätze · ${de(h.perMin)}/min${h.aborted ? ' · abgebrochen' : ''}</small></div><div class="htot ${best && h.id === best.id ? 'pr' : ''}">${h.total}</div></button>`;
   }).join('');
   return `<header class="top"><h2>Verlauf</h2><span class="ver">${st.history.length} Einheiten</span></header>
   <main class="scroll">
@@ -1012,7 +1201,7 @@ function viewMore() {
 // ---------- Render & Navigation ----------
 function render() {
   const v = { home: viewHome, edit: viewEdit, train: viewTrain, result: viewResult, history: viewHistory, more: viewMore, assess: viewAssess, plan: viewPlan, week: viewWeek }[st.view];
-  const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0;
+  const keep = st.view !== 'train' && $('.scroll') ? $('.scroll').scrollTop : 0, keepSheet = $('.sheet.cedit')?.scrollTop || 0;
   FX.stopScrambles();
   app.innerHTML = v(); app.dataset.view = st.view;
   animateFigures(app);
@@ -1020,10 +1209,11 @@ function render() {
   // vorausgewählten Chip in den sichtbaren Bereich der horizontalen Leiste holen
   app.querySelectorAll('.chips.scrollx').forEach(c => { const on = c.querySelector('.chip.on'); if (on && c.scrollWidth > c.clientWidth) c.scrollLeft = Math.max(0, on.offsetLeft - c.offsetLeft - (c.clientWidth - on.offsetWidth) / 2); });
   if (keep && st.view === st._lastView && $('.scroll')) $('.scroll').scrollTop = keep;
+  if (keepSheet && $('.sheet.cedit')) $('.sheet.cedit').scrollTop = keepSheet;
   st._lastView = st.view;
 }
 // v1.6 Effekte: Hintergrund je Ansicht/Phase, Karten-Einblendung einmal pro Ansichtswechsel, Ziffern-Effekt beim Öffnen des Ergebnisses
-const REVEAL_SEL = { home: '.sec, .extile, .lr', week: '.scroll > *', history: '.scroll > .panel, .chips, .hitem' };
+const REVEAL_SEL = { home: '.sec, .extile, .ccard, .lr', week: '.scroll > *', history: '.scroll > .panel, .chips, .hitem' };
 function applyFx() {
   const s = st.session, mode = st.view === 'home' ? 'home' : st.view === 'train' && s && !st.lead ? (s.status === 'rest' ? 'rest' : 'work') : 'off';
   FX.background(mode);
@@ -1033,7 +1223,7 @@ function applyFx() {
     st.fxScramble = false;
     const big = $('.hero .huge'), hero = $('.hero');
     FX.scramble(big, { dur: 1200, onDone: () => { if (hero?.classList.contains('pr') && FX.mode() !== 'off') hero.classList.add('flash'); } });
-    app.querySelectorAll('.grid3 b').forEach((b, i) => FX.scramble(b, { dur: 900 + i * 120 }));
+    app.querySelectorAll('.grid3 b, .ctot b').forEach((b, i) => FX.scramble(b, { dur: 900 + i * 120 }));
   }
 }
 function go(view) {
@@ -1074,6 +1264,13 @@ app.addEventListener('click', e => {
   if (d.hf) { st.histFilter = d.hf; st.devEx = undefined; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
   if (d.dex) { st.devEx = d.dex === '__all' ? null : d.dex; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
   if (d.dlim) { st.devLim = +d.dlim; st.devPt = null; st.devAnim = true; return render(); }
+  if (d.dmode) { st.devMode = d.dmode; st.devLim = null; st.devPt = null; st.devAnim = true; return render(); }
+  if (d.cst) { // Kombi-Editor: Stepper
+    const c = st.cdraft, i = +d.ci, n = $('#c-name'); if (n) c.name = n.value;
+    if (d.cst === 'rounds') c.rounds = Math.min(99, Math.max(1, c.rounds + +d.d));
+    else { const [lo, hi, stp] = LIM[d.cst]; c.steps[i][d.cst] = Math.min(hi, Math.max(lo, c.steps[i][d.cst] + stp * +d.d)); }
+    return render();
+  }
   if (d.lead) { st.settings.leadIn = +d.lead; store.saveSettings(st.settings); return render(); }
   if (d.anim) { st.settings.anim = d.anim; store.saveSettings(st.settings); FX.setPref(d.anim); return render(); }
   if (d.pv != null) { st.partialVal = +d.pv; return render(); }
@@ -1089,7 +1286,25 @@ app.addEventListener('click', e => {
       if (E.EXERCISES.includes(w.exercise) && !maxOf(w.exercise) && w.auto.enabled) return openAssess(w.exercise, 'start:' + w.id);
       return openPlan(w);
     case 'plan-start': return planStart();
-    case 'plan-go': return planGo(workoutById(d.wid));
+    case 'plan-go': return comboById(d.wid) ? comboStart(d.wid) : planGo(workoutById(d.wid));
+    // Kombi
+    case 'combo-new': st.cdraft = newCombo(); st.sheet = 'cedit'; st.cAnim = true; return render();
+    case 'combo-edit': { const c = comboById(d.cid); if (!c) return; st.cdraft = structuredClone(c); st.sheet = 'cedit'; st.cAnim = true; return render(); }
+    case 'combo-cancel': st.cdraft = null; st.sheet = null; return render();
+    case 'combo-save': return comboSave();
+    case 'combo-del': if (confirm('Kombi löschen? Der Verlauf bleibt erhalten.')) { const id = st.cdraft.id; st.combos = st.combos.filter(x => x.id !== id); saveCombos();
+      const gone = st.week.entries.filter(e => e.workoutId === id).map(e => e.id); if (gone.length) { st.week.entries = st.week.entries.filter(e => !gone.includes(e.id)); st.week.removed.push(...gone); saveWeek(); }
+      st.cdraft = null; st.sheet = null; toast('Kombi gelöscht'); render(); } return;
+    case 'cstep-ex': { const c = st.cdraft, x = c.steps[+d.ci], n = $('#c-name'); if (n) c.name = n.value; if (x.exercise !== d.cex) { x.exercise = d.cex; x.reps = E.comboReps(maxOf(d.cex)?.v); } return render(); }
+    case 'cstep-add': { const c = st.cdraft, n = $('#c-name'); if (n) c.name = n.value; if (c.steps.length >= E.COMBO_MAX_STEPS) return;
+      const used = c.steps.map(x => x.exercise), ex = E.EXERCISES.find(e => !used.includes(e)) || E.EXERCISES[0];
+      c.steps.push({ exercise: ex, reps: E.comboReps(maxOf(ex)?.v), restSec: c.steps.at(-1).restSec }); return render(); }
+    case 'cstep-del': { const c = st.cdraft, n = $('#c-name'); if (n) c.name = n.value; if (c.steps.length > E.COMBO_MIN_STEPS) c.steps.splice(+d.ci, 1); return render(); }
+    case 'cstep-up': { const c = st.cdraft, i = +d.ci, n = $('#c-name'); if (n) c.name = n.value; if (i > 0) [c.steps[i - 1], c.steps[i]] = [c.steps[i], c.steps[i - 1]]; return render(); }
+    case 'cmode': { const c = st.cdraft, l = +d.clim, n = $('#c-name'); if (n) c.name = n.value; if (l) { c.mode = 'time'; c.limitMin = l; } else c.mode = 'rounds'; return render(); }
+    case 'combo-start': return comboStart(d.cid);
+    case 'crec-wait': st.sheet = null; st.crec = null; return render();
+    case 'crec-force': return comboStart(st.crec, true);
     case 'wadd': weekAdd(+d.day); return render();
     case 'wdel': { const id = b.closest('[data-eid]').dataset.eid; st.week.entries = st.week.entries.filter(e => e.id !== id); st.week.removed.push(id); saveWeek(); return render(); }
     case 'wtpl': st.week = W.applyTemplate(st.week, d.k, resolveEx); saveWeek(); toast(`Vorlage „${W.PLAN_TEMPLATES[d.k].name}“ übernommen`); return render();
@@ -1166,7 +1381,7 @@ app.addEventListener('click', e => {
     }
     case 'import': return $('#f-import').click();
     case 'templates': st.workouts = store.restoreTemplates(); return toast('Vorlagen wiederhergestellt');
-    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
+    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.combos = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
     case 'install': st.installEvt?.prompt(); st.installEvt = null; return render();
     case 'sw-check': return checkUpdate(true);
   }
@@ -1176,6 +1391,7 @@ app.addEventListener('input', e => {
   if (e.target.id === 'f-lim') { st.draft.limitMin = +e.target.value; reauto(); const n = $('#f-name'); if (n) st.draft.name = n.value; const ex = $('#f-ex'); if (ex) st.draft.exercise = ex.value; render(); $('#f-lim')?.focus(); }
   if (e.target.id === 'f-ex') st.draft.exercise = e.target.value;
   if (e.target.id === 'f-name') st.draft.name = e.target.value;
+  if (e.target.id === 'c-name' && st.cdraft) st.cdraft.name = e.target.value;
 });
 app.addEventListener('change', async e => {
   const t = e.target;
@@ -1189,7 +1405,7 @@ app.addEventListener('change', async e => {
   if (t.dataset.wset) { st.week[t.dataset.wset] = t.checked; saveWeek(); return render(); }
   if (t.dataset.set) { st.settings[t.dataset.set] = t.checked; store.saveSettings(st.settings); applySettings(); if (t.dataset.set === 'recNotify') render(); return; }
   if (t.id === 'f-import' && t.files[0]) {
-    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); st.week = W.normalizePlan(store.plan()); applySettings();
+    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); st.week = W.normalizePlan(store.plan()); st.combos = store.combos(); applySettings();
       toast(`Importiert: ${r.workouts} Workouts, ${r.sessions} Einheiten`); render(); }
     catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
   }
@@ -1219,7 +1435,7 @@ else {
   if (dl) history.replaceState(null, '', location.pathname);
   if (needSetup()) openAssess(null, 'home', { setup: true });
   else if (dl && workoutById(dl)) openPlan(workoutById(dl));
-  else render();
+  else { render(); if (dl && comboById(dl)) $(`.ccard[data-cid="${CSS.escape(dl)}"]`)?.scrollIntoView({ block: 'center' }); }
 }
 
 // v1.6.1 Updates: neuer Service Worker übernimmt sofort (skipWaiting + clients.claim). Danach automatisch neu laden,
