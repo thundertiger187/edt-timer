@@ -1,10 +1,14 @@
-2026-11-02T20:51:18.431Z http://127.0.0.1:18745/
-✓ Rekord-Kacheln vorher – {"Liegestütze":["30","99"],"Kniebeugen":["Test offen","80"],"Dips":["Test offen","–"],"Klimmzüge":["10","–"]}
+2026-11-03T03:32:00.996Z http://127.0.0.1:18745/
+✓ Rekord-Kacheln vorher – {"Liegestütze":["30","99"],"Kniebeugen":["Test offen","80"],"Dips":["Test offen","–"],"Klimmzüge":["10","–"],"Ausfallschritte":["Test offen","–"],"Beckenheben":["Test offen","–"],"Superman":["Test offen","–"],"Sit-ups":["Test offen","–"]}
 ✓ Startseite: Abschnitt „Kombi“ unter „Übungen“, leerer Zustand mit „Kombi anlegen“
-✓ Kombi über die UI angelegt (Liegestütze 12/20 s, Klimmzüge 4/20 s, 10 min) und in edt.combos gespeichert – cmvzi8brcvrlw
+✓ Kombi über die UI angelegt (Liegestütze 12/20 s, Klimmzüge 4/20 s, 10 min) und in edt.combos gespeichert – cmvzi8bryvswq
 ✓ Satz 1: „12 Liegestütze“ groß, darunter „Danach: 4 Klimmzüge“, Ansage „Los: 12 Liegestütze“
 ✓ Übungen wechseln sich ab (18 Sätze), Pausen 20 s, Ansagen „Pause 20 Sekunden. Nächster Satz: …“ und „Los: …“
 ✓ Ergebnis: Summen je Übung + Gesamt, Verlaufseintrag type combo – 108 + 34 = 142
 ✓ Rekord-Kacheln unverändert, „Zuletzt“ zeigt „Push & Pull“ + Kombi, Erholung für beide Muskelgruppen + Warnung mit 2 Uhren – Brust/Trizeps/Schulter, Rücken/Bizeps
 ✓ Verlauf: Regulär ohne Kombi, Kombi nur Kombi (Filter Klimmzüge), Gesamt summiert beide pro Tag – heute 222
+✓ Kombi-Editor: eigene Übung „Burpees“ als Schritt wählbar (gestrichelt), gespeichert – Sit-ups → Burpees
+✓ Kombi-Training mit eigener Übung: Wechsel Sit-ups/Burpees, Ansage „Nächster Satz: 5 Burpees“, Summen und Verlauf je Übung
+✓ Erholung nach Kombi: Kacheln Burpees (eigene Gruppe) und Sit-ups (Bauch) mit Countdown, andere frei
+✓ Löschen gesperrt, solange eine Kombi die Übung nutzt; Kombi-Verlauf filterbar nach Burpees
 ✓ Leere Zustände je Modus verschieden

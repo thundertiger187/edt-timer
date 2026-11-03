@@ -606,11 +606,11 @@ html[data-motion=off] .fx-glow{display:none}html[data-motion=off] .rv{opacity:1!
 .cempty p{margin:0 0 12px;font-size:14px;line-height:1.45}
 .ktag{display:inline-block;margin-left:8px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);border:1px solid rgba(56,217,255,.45);border-radius:6px;padding:1px 6px;vertical-align:2px}
 .noanim{animation:none!important}
-.sheet.cedit,.sheet.crecsheet{max-height:90dvh;overflow-y:auto;overscroll-behavior:contain}
+.sheet.cedit,.sheet.crecsheet,.sheet.xedit{max-height:90dvh;overflow-y:auto;overscroll-behavior:contain}
 .cfield{display:block;margin:0 0 14px}
 .cfield>small{display:block;font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;margin:0 2px 6px}
-#c-name{width:100%;height:50px;border-radius:14px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:17px;outline:none;color:var(--tx)}
-#c-name:focus{border-color:var(--acc2)}
+#c-name,#x-name{width:100%;height:50px;border-radius:14px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:17px;outline:none;color:var(--tx)}
+#c-name:focus,#x-name:focus{border-color:var(--acc2)}
 .cstep{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:12px}
 .cstep-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}.cstep-h span{flex:1}
 .cstep-h .icon.sm{width:36px;height:36px}
@@ -641,3 +641,31 @@ html[data-motion=off] .fx-glow{display:none}html[data-motion=off] .rv{opacity:1!
 /* Verlauf */
 .dev .devmode{margin-bottom:8px}
 .devnote{margin:6px 0 0}
+
+/* v1.8.0: 8 Grundübungen + eigene Übungen als Kacheln, kompakter: Symbol neben dem Namen, Werte als zwei Zeilen */
+.home .extile{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:36px auto;column-gap:10px;row-gap:10px;align-items:center;justify-items:stretch;min-height:0;padding:12px}
+.home .extile .tf{grid-row:1;grid-column:1;width:36px;height:36px;border-radius:11px;margin:0}
+.home .extile .tilefig{width:32px;height:27px}
+.home .extile .exname{grid-row:1;grid-column:2;font-size:15.5px;line-height:1.12;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.home .extile .tv{grid-column:1/-1;margin:0;flex-direction:column;gap:3px}
+.home .extile .tv>span{flex-direction:row;justify-content:space-between;align-items:baseline;gap:6px}
+.home .extile .tv small{font-size:11.5px}
+.home .extile .tv b{font-size:17px;line-height:20px}
+.home .extile .tv .exmax.need b{font-size:13px;white-space:nowrap}
+.home .extile .exrec{grid-column:1/-1;margin:0;padding:0;font-size:11.5px}
+.home .extile .exrec.ph{display:none}
+/* eigene Übung: neutrales Kürzel statt Strichmännchen, gestrichelter Rahmen */
+.tf.mono{border:1px dashed rgba(154,166,178,.55);background:transparent;font-size:13px;font-weight:900;letter-spacing:.03em;color:var(--mut)}
+.home .extile.open .tf.mono{color:var(--acc2);border-color:rgba(56,217,255,.6)}
+.home .addex{grid-column:1/-1;min-height:48px;border-radius:16px;border:1px dashed var(--bd);background:transparent;color:var(--mut);font-weight:700;font-size:15px}
+.home .addex:active{transform:scale(.98)}
+.xp-own{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:-4px 4px 10px;font-size:13px;color:var(--mut)}
+.xp-own .lk{white-space:nowrap}
+.chip.cx{border-style:dashed}
+.xmus{gap:6px}.xmus .chip{min-height:40px;padding:0 12px;font-size:14px}
+.xedit .cfield{margin-bottom:12px}
+.xerr{color:var(--warn);font-weight:700;margin:0 0 10px}
+.exnote{display:block;margin-top:6px}
+.setup .extile.cust{border-style:dashed}
+.fig .fbody polyline.back{opacity:.55}
+.xedit .btn.wide{margin-top:8px}

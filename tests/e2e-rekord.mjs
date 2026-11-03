@@ -47,7 +47,7 @@ for (const t of tiles) assert.doesNotMatch(t.text, /erholt/, `${t.name}: kein �
 assert.equal(await page.$$eval('.extiles .exrec.ok', e => e.length), 0);
 ok('Kacheln: Max am Stück / Rekord 5 min (max, verkürzte Erholung zählt, 10 min/abgebrochen ignoriert, ältere Einträge), kein „erholt“', tiles.map(t => `${t.name}: ${t.max} · ${t.best}${t.rec ? ' · ' + t.rec : ''}`).join(' | '));
 // Kacheln passen auf 390 px: kein Überlauf, Werte überlappen die Figur nicht
-const lay = await page.$$eval('.extiles .extile:not(.own)', e => e.map(x => { const r = x.getBoundingClientRect(), s = x.querySelector('.tv').getBoundingClientRect(), f = x.querySelector('.tilefig').getBoundingClientRect();
+const lay = await page.$$eval('.extiles .extile:not(.own)', e => e.map(x => { const r = x.getBoundingClientRect(), s = x.querySelector('.tv').getBoundingClientRect(), f = x.querySelector('.tf').getBoundingClientRect(); // v1.8.0: Figur bzw. Kürzel (eigene Übung)
   return { over: x.scrollWidth > x.clientWidth + 1, stR: s.right, stB: s.bottom, fL: f.left, fT: f.top, fB: f.bottom, sT: s.top, inside: s.right <= r.right }; }));
 for (const l of lay) { assert.ok(!l.over && l.inside); assert.ok(l.fB <= l.sT + 1, 'Werte überlappen Figur'); }
 ok('Layout 390 px: kein Überlauf, keine Überlappung mit Figur');
@@ -61,10 +61,12 @@ assert.equal(await page.$$eval('.extile:has-text("Klimmzüge") .exrec.wait', e =
 assert.doesNotMatch(await page.textContent('.extiles'), /erholt/);
 ok('Countdown abgelaufen → Zeile weg, kein „erholt“');
 // Eigene Übungen: Rekord 5 min aus workoutId-Eintrag
-await page.click('[data-exsel="__own"]'); await page.waitForSelector('.card[data-id="own-burpee"]');
-const cr = await page.textContent('.card[data-id="own-burpee"] .cardrec .exbest'); assert.doesNotMatch(await page.textContent('.card[data-id="own-burpee"] .cardrec'), /erholt/);
-assert.equal(cr.trim(), 'Rekord 5 min 63'); ok('Eigene Übung: Rekord 5 min ohne „erholt“', cr.trim());
-await page.click('[data-exsel="__own"]'); await page.waitForTimeout(500);
+// v1.8.0: eigene Übung hat eine eigene Kachel (aus dem Workout übernommen), Rekord steht dort
+const ct = '.extile.cust[data-exsel="Burpees"]'; await page.waitForSelector(ct);
+const cr = await page.textContent(ct + ' .exbest'); assert.doesNotMatch(await page.textContent(ct), /erholt/);
+assert.equal(cr.trim(), 'Rekord 5 min 63'); ok('Eigene Übung: eigene Kachel, Rekord 5 min ohne „erholt“', cr.trim());
+await page.click(ct); await page.waitForSelector('#xp-panel[data-panel="Burpees"] .card[data-id="own-burpee"]');
+await page.click(ct); await page.waitForTimeout(500);
 assert.deepEqual(errors, []); ok('Keine JS-Fehler');
 fs.writeFileSync(path.join(ROOT, 'tests', 'e2e-rekord-ergebnis.txt'), `${new Date().toISOString()} ${base}\n${log.join('\n')}\n`);
 await browser.close(); server?.kill();

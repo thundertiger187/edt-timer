@@ -1,7 +1,10 @@
 // EDT Timer – Ablauf-Logik (rein, ohne DOM). Alle Zeiten in ms, "now" wird immer übergeben.
 // Dadurch driftfrei (Zeitstempel statt Zählen) und deterministisch testbar.
 
-export const EXERCISES = ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge'];
+// v1.8.0: Grundübungen erweitert. Reihenfolge = Kacheln auf der Startseite (2 Spalten):
+// Liegestütze | Kniebeugen · Dips | Klimmzüge · Ausfallschritte | Beckenheben (Beine/Gesäß) · Superman | Sit-ups (Rumpf)
+export const EXERCISES = ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge', 'Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups'];
+export const NEW_EXERCISES_180 = ['Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups'];
 
 // ---------- Fitnesstest → EDT-Plan aus Maximalwiederholungen ----------
 // Stufengrenzen [Mittel ab, Fortgeschritten ab] je Übung; Pausenfaktor für schwerere Übungen.
@@ -10,6 +13,10 @@ export const LEVEL_RULES = {
   'Kniebeugen': { th: [25, 50], f: 1 },
   'Dips': { th: [8, 20], f: 1.25 },
   'Klimmzüge': { th: [5, 12], f: 1.5 },
+  'Ausfallschritte': { th: [16, 36], f: 1 }, // Wdh. = Schritte gesamt (beide Beine)
+  'Beckenheben': { th: [20, 40], f: 1 },
+  'Superman': { th: [12, 30], f: 1 },
+  'Sit-ups': { th: [20, 40], f: 1 },
   _: { th: [10, 25], f: 1 },
 };
 export const LEVELS = [
@@ -297,7 +304,7 @@ export function describe(w) {
 
 // ---------- Phasen-Zeiträume ----------
 /** Geschätzte Dauer einer Wiederholung in Sekunden je Übung (inkl. kurzer Umkehrpunkte). */
-export const SEC_PER_REP = { 'Liegestütze': 2, 'Kniebeugen': 2, 'Dips': 2.5, 'Klimmzüge': 3, _: 2.5 };
+export const SEC_PER_REP = { 'Liegestütze': 2, 'Kniebeugen': 2, 'Dips': 2.5, 'Klimmzüge': 3, 'Ausfallschritte': 2.5, 'Beckenheben': 2, 'Superman': 2.5, 'Sit-ups': 2, _: 2.5 };
 export const secPerRepFor = ex => SEC_PER_REP[ex] ?? SEC_PER_REP._;
 export const MAX_PHASES = 4;
 
@@ -432,6 +439,9 @@ export const MUSCLE_GROUPS = {
   push: { name: 'Brust/Trizeps/Schulter', muscles: ['Brust', 'Trizeps', 'Schulter'] },
   legs: { name: 'Beine', muscles: ['Beine'] },
   pull: { name: 'Rücken/Bizeps', muscles: ['Rücken', 'Bizeps'] },
+  glutes: { name: 'Gesäß/hinterer Oberschenkel', muscles: ['Gesäß', 'Hintere Oberschenkel'] }, // v1.8.0
+  lowback: { name: 'Unterer Rücken', muscles: ['Unterer Rücken'] },
+  core: { name: 'Bauch', muscles: ['Bauch'] },
   own: { name: 'eigene', muscles: [] }, // eigene Übung: überschneidet sich nur mit sich selbst
 };
 export const EXERCISE_MUSCLES = {
@@ -439,11 +449,18 @@ export const EXERCISE_MUSCLES = {
   'Dips': { group: 'push', muscles: ['Brust', 'Trizeps', 'Schulter'] },
   'Kniebeugen': { group: 'legs', muscles: ['Beine'] },
   'Klimmzüge': { group: 'pull', muscles: ['Rücken', 'Bizeps'] },
+  // v1.8.0: Ausfallschritte teilen sich Beine mit Kniebeugen und Gesäß mit Beckenheben
+  'Ausfallschritte': { group: 'legs', name: 'Beine/Gesäß', muscles: ['Beine', 'Gesäß'] },
+  'Beckenheben': { group: 'glutes', muscles: ['Gesäß', 'Hintere Oberschenkel'] },
+  'Superman': { group: 'lowback', muscles: ['Unterer Rücken'] },
+  'Sit-ups': { group: 'core', muscles: ['Bauch'] },
 };
+/** Auswahl der Muskelgruppe für eigene Übungen (Reihenfolge im Editor). */
+export const MUSCLE_CHOICES = ['push', 'pull', 'legs', 'glutes', 'lowback', 'core', 'own'];
 /** { group, name, muscles } einer Übung; eigene Übungen über die im Editor gewählte Gruppe. */
 export function musclesOf(exercise, muscle) {
   const k = EXERCISE_MUSCLES[exercise];
-  if (k) return { group: k.group, name: MUSCLE_GROUPS[k.group].name, muscles: k.muscles };
+  if (k) return { group: k.group, name: k.name || MUSCLE_GROUPS[k.group].name, muscles: k.muscles };
   const g = MUSCLE_GROUPS[muscle] && muscle !== 'own' ? muscle : 'own';
   return { group: g, name: g === 'own' ? String(exercise || 'eigene Übung') : MUSCLE_GROUPS[g].name,
     muscles: g === 'own' ? ['eigen:' + String(exercise || '').toLowerCase()] : MUSCLE_GROUPS[g].muscles };
@@ -579,7 +596,7 @@ const snapLimit = m => COMBO_LIMITS.reduce((a, b) => Math.abs(b - m) < Math.abs(
 export function normalizeCombo(c) {
   c = c || {};
   const steps = (Array.isArray(c.steps) ? c.steps : []).filter(Boolean).slice(0, COMBO_MAX_STEPS)
-    .map(x => ({ exercise: EXERCISES.includes(x.exercise) ? x.exercise : EXERCISES[0], reps: clamp(int(x.reps, 5), 1, 999), restSec: clamp(int(x.restSec, 20), 0, 600) }));
+    .map(x => ({ exercise: exName(x.exercise) || EXERCISES[0], reps: clamp(int(x.reps, 5), 1, 999), restSec: clamp(int(x.restSec, 20), 0, 600) }));
   while (steps.length < COMBO_MIN_STEPS) steps.push({ exercise: steps.length ? 'Klimmzüge' : 'Liegestütze', reps: 5, restSec: 20 });
   return {
     id: String(c.id || 'c' + Math.random().toString(36).slice(2, 10)),
@@ -588,6 +605,8 @@ export function normalizeCombo(c) {
     limitMin: snapLimit(int(c.limitMin, 10)), rounds: clamp(int(c.rounds, 5), 1, 99),
   };
 }
+// v1.8.0: Kombi-Schritte dürfen auch eigene Übungen sein (Name, max. 40 Zeichen)
+function exName(v) { return typeof v === 'string' ? v.trim().slice(0, 40) : ''; }
 export const comboExercises = c => [...new Set(c.steps.map(x => x.exercise))];
 /** Workout-Objekt für createSession. */
 export function comboWorkout(c) {
@@ -619,5 +638,70 @@ export const TEMPLATES = [
   tpl('tpl-kniebeugen-10', 'Kniebeugen-EDT 10 min', 'Kniebeugen', 10, 35, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'rest', rest: 5 }),
   tpl('tpl-dips-6', 'Dips-EDT 6 min', 'Dips', 6, 12, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'reps', reps: 1, minReps: 2 }),
   tpl('tpl-klimmzug-8', 'Klimmzug-EDT 8 min', 'Klimmzüge', 8, 8, { pct: 40, variant: 'reps' }, { enabled: true, mode: 'both', reps: 1, rest: 10, minReps: 1 }),
+  // v1.8.0
+  tpl('tpl-ausfall-5', 'Ausfallschritte-EDT 5 min', 'Ausfallschritte', 5, 24, { pct: 40, variant: 'reps' }, { enabled: false }),
+  tpl('tpl-becken-5', 'Beckenheben-EDT 5 min', 'Beckenheben', 5, 30, { pct: 40, variant: 'reps' }, { enabled: false }),
+  tpl('tpl-superman-5', 'Superman-EDT 5 min', 'Superman', 5, 20, { pct: 40, variant: 'reps' }, { enabled: false }),
+  tpl('tpl-situps-5', 'Sit-up-EDT 5 min', 'Sit-ups', 5, 30, { pct: 40, variant: 'reps' }, { enabled: false }),
 ].map(normalizeWorkout);
 
+
+// ---------- Eigene Übungen (v1.8.0) ----------
+/** Vergleichsschlüssel: nur Buchstaben, klein (ä/ö/ü/ß bleiben). „Sit ups“ = „Situps“ = „Sit-Ups“. */
+export const exKey = n => String(n || '').toLowerCase().replace(/[^a-zäöüß]/g, '');
+const BASE_ALIASES = { situp: 'Sit-ups', glutebridge: 'Beckenheben', glutebridges: 'Beckenheben', ausfallschritt: 'Ausfallschritte', lunges: 'Ausfallschritte', liegestuetze: 'Liegestütze', kniebeuge: 'Kniebeugen', klimmzug: 'Klimmzüge', dip: 'Dips' };
+/** Grundübung zu einem frei eingegebenen Namen (gleiche Schreibweise bis auf Groß/Klein, Leer- und Bindestriche) oder null. */
+export function baseExercise(name) {
+  const k = exKey(name); if (!k) return null;
+  return EXERCISES.find(e => exKey(e) === k) || BASE_ALIASES[k] || null;
+}
+export function normalizeCustomEx(x) {
+  x = x || {};
+  return { id: String(x.id || 'x' + Math.random().toString(36).slice(2, 10)), name: String(x.name || '').trim().slice(0, 40),
+    muscle: MUSCLE_GROUPS[x.muscle] ? x.muscle : 'own' };
+}
+/**
+ * Liste eigener Übungen bereinigen und um Übungen ergänzen, die bisher nur in Workouts/Kombis vorkommen
+ * (vor v1.8.0 gab es keine eigene Liste: eigene Übung = Workout mit freiem Übungsnamen).
+ * Grundübungen und doppelte Namen (Groß/Klein) werden entfernt. Muskelgruppe aus dem ersten Workout der Übung.
+ */
+export function mergeCustomExercises(list, workouts = [], combos = []) {
+  const out = [], seen = new Set();
+  const push = x => { const c = normalizeCustomEx(x), k = exKey(c.name); if (!c.name || !k || baseExercise(c.name) || seen.has(k)) return; seen.add(k); out.push(c); };
+  for (const x of Array.isArray(list) ? list : []) if (x) push(x);
+  for (const w of workouts || []) if (w && w.exercise) push({ name: w.exercise, muscle: w.muscle });
+  for (const c of combos || []) for (const x of c?.steps || []) if (x && x.exercise) push({ name: x.exercise, muscle: (workouts || []).find(w => w.exercise === x.exercise)?.muscle });
+  return out;
+}
+/**
+ * Übungsnamen in allen gespeicherten Daten umbenennen (Workouts, Verlauf, Fitnesstest-Maxima, Anpassungen, Kombis).
+ * rename: { [alterName]: neuerName }. Rein, gibt neue Objekte zurück und die Zahl der geänderten Einträge.
+ */
+export function renameExercises(data, rename) {
+  const map = Object.entries(rename || {}).filter(([a, b]) => a && b && a !== b);
+  if (!map.length) return { ...data, changed: 0 };
+  const R = Object.fromEntries(map), to = n => (n != null && Object.prototype.hasOwnProperty.call(R, n) ? R[n] : n);
+  let changed = 0; const ch = (a, b) => { if (a !== b) changed++; return b; };
+  const workouts = (data.workouts || []).map(w => ({ ...w, exercise: ch(w.exercise, to(w.exercise)) }));
+  const history = (data.history || []).map(h => {
+    if (!h) return h; const o = { ...h };
+    if (o.exercise != null) o.exercise = ch(h.exercise, to(h.exercise));
+    if (Array.isArray(h.exercises)) o.exercises = [...new Set(h.exercises.map(e => ch(e, to(e))))];
+    if (h.perEx) { o.perEx = {}; for (const [k, v] of Object.entries(h.perEx)) { const n = ch(k, to(k)); o.perEx[n] = (o.perEx[n] || 0) + v; } }
+    if (Array.isArray(h.steps)) o.steps = h.steps.map(x => ({ ...x, exercise: ch(x.exercise, to(x.exercise)) }));
+    if (Array.isArray(h.sets) && h.sets.some(x => x && x.ex != null)) o.sets = h.sets.map(x => (x && x.ex != null ? { ...x, ex: ch(x.ex, to(x.ex)) } : x));
+    return o;
+  });
+  const maxes = {};
+  for (const [k, l] of Object.entries(data.maxes || {})) { const n = ch(k, to(k)); maxes[n] = [...(maxes[n] || []), ...(l || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))); }
+  const tunes = {};
+  for (const [k, t] of Object.entries(data.tunes || {})) { const n = to(k); if (n !== k) changed++; if (!tunes[n] || n === k) tunes[n] = t; }
+  const combos = (data.combos || []).map(c => ({ ...c, steps: (c.steps || []).map(x => ({ ...x, exercise: ch(x.exercise, to(x.exercise)) })) }));
+  return { ...data, workouts, history, maxes, tunes, combos, changed };
+}
+/** v1.8.0 Migration: eigene Übungen, die einer neuen Grundübung entsprechen (z. B. „Situps“, „ausfallschritte“), werden zur Grundübung. */
+export function baseRenames(names, targets = NEW_EXERCISES_180) {
+  const r = {};
+  for (const n of names) { const b = baseExercise(n); if (b && b !== n && targets.includes(b)) r[n] = b; }
+  return r;
+}

@@ -11,12 +11,12 @@ PWA: installierbar (iOS Safari: Teilen → „Zum Home-Bildschirm“, Android Ch
 
 ## Funktionen
 
-- **Übungen:** Liegestütze, Kniebeugen, Dips, Klimmzüge als Hauptauswahl auf der Startseite; eigene Übungen als Nebenoption.
+- **Übungen:** 8 Grundübungen als Kacheln auf der Startseite (Liegestütze, Kniebeugen, Dips, Klimmzüge, Ausfallschritte, Beckenheben, Superman, Sit-ups), dahinter eigene Übungen als eigene Kacheln (seit v1.8.0).
 - **Fitnesstest (Setup beim ersten Start):** Übung wählen → Anleitung „So viele saubere Wiederholungen wie möglich bis zum Muskelversagen“ → Countdown 3, 2, 1 mit Ton und Ansage → „Start“, große laufende Zeit → „Stopp“ → Anzahl eingeben (Stepper oder Zahlenfeld) → Plan-Vorschau mit 3 Phasen → speichern → nächste Übung testen oder „Fertig“. Gespeichert werden Maximum, Datum und Testdauer (ergibt das Tempo in s/Wdh. für die Zeitschätzung). „Ohne Test: Maximum eingeben“ und „Überspringen“ sind möglich.
 - **Fitnesstest wiederholen:** jederzeit über „Fitnesstest wiederholen“ auf der Startseite, im Editor und unter „Mehr → Fitnesstest“ (je Übung). Ein neuer Wert berechnet die Phasen neu; gespeicherte Anpassungen werden proportional umgerechnet.
 - **EDT-Plan aus Fitnesstest** (abschaltbar, Formel im Editor sichtbar, Satzgröße, Phasenzahl 2/3 und Variante der letzten Phase einstellbar; manuelle Phasenänderung schaltet die Automatik ab). Die Plan-Vorschau zeigt die Herkunft, z. B. „Aus Fitnesstest: max 25 Liegestütze am 30.10.2026 · Stufe Mittel“.
 - **Workout-Editor:** Zeitlimit 1–60 min, bis zu 4 Phasen mit Zeitraum je Phase (Wdh. pro Satz, Pause, Sätze; letzte Phase „bis Zeitende“), Zählweise (Satz bestätigen / jede Wdh. tippen), Auto-Anpassung während des Trainings (Wdh. senken, Pause verlängern oder beides, mit Mindest-Wdh.).
-- **Vorlagen (3 Phasen):** Liegestütz-EDT 5 min, Liegestütze 5 min – Pausen steigen, Kniebeugen-EDT 10 min, Dips-EDT 6 min, Klimmzug-EDT 8 min.
+- **Vorlagen (3 Phasen):** Liegestütz-EDT 5 min, Liegestütze 5 min – Pausen steigen, Kniebeugen-EDT 10 min, Dips-EDT 6 min, Klimmzug-EDT 8 min, Ausfallschritte-EDT 5 min, Beckenheben-EDT 5 min, Superman-EDT 5 min, Sit-up-EDT 5 min.
 - **Training:** großer Gesamt-Countdown mit Fortschrittsbalken und Phasenmarken, „Phase 1/3 · Satz 2/4 · gesamt 2“, Ziel-Wdh., Knopf „Satz geschafft“ über das untere Drittel, +/- für Teilsätze, danach Pausen-Countdown mit Ring. Letzten Satz in der Pause korrigierbar und bewertbar, Pause überspringbar. Gesamt-Wdh., Hochrechnung aufs Zeitende und Vergleich mit dem Bestwert. Endet die Zeit während eines Satzes, wird der Teilsatz abgefragt.
 - **Audio/Haptik:** deutsche Sprachansagen („3, 2, 1“, „Start“, „Pause 15 Sekunden“, „Neue Phase …“, „Noch eine Minute“), Pieptöne (WebAudio), Vibration (wo verfügbar), Wake Lock.
 - **Ergebnis & Verlauf:** Gesamt-Wdh., Sätze, Wdh./Minute, Balkendiagramm pro Satz, Bestwert je Workout, Fortschrittskurve, Maximalwerte je Übung. Fitnesstest-Empfehlung, wenn der Bestwert um ≥ 10 % steigt oder der letzte Test älter als 4 Wochen ist. Export/Import als JSON (auch alte RepZeit-Exporte).
@@ -60,6 +60,26 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 ```
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
+
+## Neue Grundübungen und eigene Übungen als Kacheln (v1.8.0)
+
+- **Neue Grundübungen:** Ausfallschritte, Beckenheben, Superman, Sit-ups. Jede hat eine Muskelgruppe, ein Strichmännchen (Kachel, Panel, Fitnesstest-Anleitung), eine 5-min-Vorlage (Auto-Plan aus), Level-Schwellen für den Fitnesstest und ein Tempo für die Zeitschätzung. Sie funktionieren überall wie die bisherigen vier: Erholung, Fitnesstest, Phasen, Rekorde, Diagramm, Wochenplan, Kombi.
+  - Muskelgruppen: Ausfallschritte = Beine + Gesäß, Beckenheben = Gesäß/hinterer Oberschenkel, Superman = Unterer Rücken, Sit-ups = Bauch. Überschneidungen für die Erholung: Kniebeugen ↔ Ausfallschritte (Beine), Ausfallschritte ↔ Beckenheben (Gesäß). Kniebeugen und Beckenheben teilen sich keine Gruppe.
+  - Ausfallschritte: Gezählt wird jeder Schritt, links und rechts im Wechsel (steht in der Fitnesstest-Anleitung).
+- **Startseite „Übungen“:** Kompakte Kacheln in 2 Spalten (Figur links neben dem Namen, darunter „Max am Stück“ und „Rekord 5 min“ als Zeilen). Reihenfolge: Liegestütze | Kniebeugen, Dips | Klimmzüge, Ausfallschritte | Beckenheben, Superman | Sit-ups, danach die eigenen Übungen in Anlege-Reihenfolge und ganz unten „+ Eigene Übung“. Lange Namen werden weich getrennt („Ausfall-schritte“) und höchstens zweizeilig gesetzt. Geprüft auf 360×640, 375×667, 390×844, 412×915 und 844×390 (`tests/e2e-layout.mjs`).
+- **Eigene Übungen als Kacheln:** Jede eigene Übung hat eine eigene Kachel mit Namen. Statt Figur steht ein neutrales Kürzel (Anfangsbuchstaben, gestrichelter Rahmen). Tippen öffnet dasselbe Panel wie bei Grundübungen: Fitnesstest-Box, Workouts, „+ Neues Workout“ und zusätzlich die Zeile „Eigene Übung · …“ mit „Übung bearbeiten“. Anders als bei Grundübungen wird beim ersten Öffnen kein Fitnesstest erzwungen.
+  - **Anlegen:** „+ Eigene Übung“ → Name (max. 40 Zeichen) und Muskelgruppe (Brust/Trizeps/Schulter, Rücken/Bizeps, Beine, Gesäß/hint. Oberschenkel, Unterer Rücken, Bauch oder „Nur diese Übung“). Abgelehnt werden: leerer Name, Namen von Grundübungen (auch „Situps“, „Glute Bridge“ …), doppelte Namen, Namen ohne Buchstaben. Alternativ entsteht eine eigene Übung weiterhin im Workout-Editor über „Neue …“.
+  - **Bearbeiten:** Umbenennen ändert auch Workouts, Kombis, Verlauf, Fitnesstest-Werte und Phasen-Anpassungen. Die Muskelgruppe gilt auch für die Workouts der Übung.
+  - **Löschen:** nur, wenn keine Kombi die Übung nutzt (sonst Hinweis mit Kombi-Name). Nach Rückfrage werden die Übung, ihre Workouts und deren Wochenplan-Einträge entfernt. Verlauf und Fitnesstest-Werte bleiben.
+  - Gespeichert unter `edt.exercises` (`{id, name, muscle}`), enthalten in Export/Import.
+- **Eigene Übungen in der Kombi:** Im Kombi-Editor stehen alle Grund- und eigenen Übungen als Chips (eigene gestrichelt). Training, Ansage („Pause 20 Sekunden. Nächster Satz: 5 Burpees“), Ergebnis, Verlauf (Kombi-Filter) und Erholung funktionieren damit. Eine eigene Übung mit „Nur diese Übung“ bekommt eine eigene Erholungsgruppe, blockiert also keine andere Übung.
+- **Migration:** Beim ersten Start von 1.8.0 werden alle `edt.*`-Daten einmal nach `edt.backup-1.8.0` gesichert (nur wenn schon Workouts existieren). Danach:
+  - Eigene Übungen, die einer neuen Grundübung entsprechen, werden umbenannt („Situps“/„Sit ups“ → Sit-ups, „Glute Bridge“ → Beckenheben, „Lunges“/„Ausfallschritt“ → Ausfallschritte), in Workouts, Verlauf, Maxima, Anpassungen und Kombis. Gleichnamige Maxima werden zusammengeführt. Die App meldet das einmal („Jetzt Grundübung: Situps → Sit-ups“).
+  - Alle übrigen eigenen Übungen aus Workouts und Kombis werden zu Kacheln (`edt.exercises`), mit der Muskelgruppe aus dem Workout.
+  - Fehlende Vorlagen der vier neuen Übungen werden ergänzt. Vorhandene Workouts bleiben unverändert.
+  - Die frühere Zeile „Eigene Übungen“ (`exSel: '__own'`) gibt es nicht mehr.
+- **Weitere Änderungen:** Die Rekord-Zeile auf den Workout-Karten eigener Übungen entfällt, weil Rekord und Erholung jetzt auf der Kachel stehen. Der Erholungstext unter „Mehr“ nennt die neuen Überschneidungen.
+- **Tests:** `tests/store.test.mjs` (Upgrade, Sicherung, Umbenennen, Export/Import), neue Fälle in `tests/engine.test.mjs` und `tests/week.test.mjs` (Segmentlängen der neuen Figuren). E2E: `tests/e2e-uebungen.mjs` (Kacheln, Panels, Anlegen/Umbenennen/Löschen, Migration aus 1.7.0, Screenshots 80–85), `tests/e2e-combo.mjs` (eigene Übung als Kombi-Schritt), `tests/e2e-layout.mjs` (Startseite auf allen Größen).
 
 ## Kombi-Training und Diagramm Regulär/Kombi/Gesamt (v1.7.0)
 

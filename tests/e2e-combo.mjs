@@ -152,6 +152,65 @@ await page.clock.runFor(1200); await page.$eval('.dev', e => e.scrollIntoView({ 
 await page.click('[data-dmode=reg]'); v = await dev(); assert.equal(v.on, 'Regulär');
 ok('Verlauf: Regulär ohne Kombi, Kombi nur Kombi (Filter Klimmzüge), Gesamt summiert beide pro Tag', `heute ${L + K + 80}`);
 
+// --- v1.8.0: eigene Übung als Kombi-Schritt (Editor, Training, Ansage, Verlauf, Erholung, Löschschutz)
+{
+  const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+  await ctx3.addInitScript(() => { window.__said = []; Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak: u => window.__said.push(u.text), cancel() {}, getVoices: () => [], addEventListener() {}, speaking: false, pending: false } }); });
+  const p3 = await ctx3.newPage(); p3.on('pageerror', e => errors.push(e.message)); await p3.clock.install({ time: new Date(NOW) });
+  await p3.goto(base); await p3.waitForSelector('.setup, .extiles');
+  await p3.evaluate(({ settings }) => { localStorage.setItem('edt.history', '[]'); localStorage.setItem('edt.settings', JSON.stringify(settings)); localStorage.removeItem('edt.combos');
+    localStorage.setItem('edt.exercises', JSON.stringify([{ id: 'x-burpee', name: 'Burpees', muscle: 'own' }])); }, { settings });
+  await p3.reload(); await p3.waitForSelector('.extiles');
+  await p3.click('.kombi [data-act=combo-new]'); await p3.waitForSelector('.sheet.cedit');
+  const chips = await p3.$$eval('.cstep[data-ci="0"] [data-act=cstep-ex]', e => e.map(x => [x.dataset.cex, x.classList.contains('cx')]));
+  assert.deepEqual(chips.map(x => x[0]), ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge', 'Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups', 'Burpees']);
+  assert.deepEqual(chips.filter(x => x[1]).map(x => x[0]), ['Burpees'], 'eigene Übung gestrichelt');
+  await p3.click('.cstep[data-ci="0"] [data-cex="Sit-ups"]'); await p3.click('.cstep[data-ci="1"] [data-cex="Burpees"]');
+  await p3.click('[data-act=cmode][data-clim="0"]'); for (let i = 0; i < 3; i++) await p3.click('[data-cst=rounds][data-d="-1"]');
+  await p3.fill('#c-name', 'Rumpf & Burpees');
+  await p3.$eval('.cstep[data-ci="1"]', e => e.scrollIntoView({ block: 'center' })); await p3.clock.runFor(600); await p3.waitForTimeout(300);
+  await p3.screenshot({ path: path.join(SCREENS, '83_kombi_eigene.png') });
+  await p3.click('[data-act=combo-save]'); await p3.waitForSelector('.ccard');
+  const C3 = (await p3.evaluate(() => JSON.parse(localStorage.getItem('edt.combos'))))[0];
+  assert.deepEqual([C3.mode, C3.rounds, C3.steps.map(x => [x.exercise, x.reps])], ['rounds', 2, [['Sit-ups', 5], ['Burpees', 5]]]);
+  assert.match(await p3.textContent('.ccard .csteps'), /5 Sit-ups · 20 s\s*→\s*5 Burpees · 20 s/);
+  ok('Kombi-Editor: eigene Übung „Burpees“ als Schritt wählbar (gestrichelt), gespeichert', C3.steps.map(x => x.exercise).join(' → '));
+  await p3.click('.ccard [data-act=combo-start]'); await p3.waitForSelector('#t-lead'); await p3.clock.runFor(5100); await p3.waitForSelector('.cwork');
+  assert.equal((await p3.textContent('.cwork .cex')).trim(), '5 Sit-ups'); assert.match(await p3.textContent('.cwork .cnext'), /Danach: 5 Burpees/);
+  const exs = [];
+  for (let i = 0; i < 6 && !(await p3.$('.ctot')); i++) {
+    exs.push((await p3.textContent('.cwork .cex')).trim()); await p3.evaluate(() => { window.__said.length = 0; });
+    await p3.click('[data-act=done]'); await p3.waitForTimeout(100);
+    if (await p3.$('[data-act=skip]')) {
+      const said = await p3.evaluate(() => [...window.__said]), nx = exs.at(-1).includes('Sit-ups') ? '5 Burpees' : '5 Sit-ups';
+      assert.ok(said.includes(`Pause 20 Sekunden. Nächster Satz: ${nx}`), `Ansage: ${said}`);
+      await p3.clock.runFor(20200); await p3.waitForSelector('.cwork, .ctot');
+    }
+  }
+  assert.deepEqual(exs, ['5 Sit-ups', '5 Burpees', '5 Sit-ups', '5 Burpees']);
+  await p3.waitForSelector('.ctot'); await p3.clock.runFor(2500);
+  assert.deepEqual(await p3.$$eval('.ctot > div', e => e.map(x => [x.querySelector('small').textContent, x.querySelector('b').textContent])), [['Sit-ups', '10'], ['Burpees', '10'], ['Gesamt', '20']]);
+  const h3 = (await p3.evaluate(() => JSON.parse(localStorage.getItem('edt.history')))).find(x => x.comboId === C3.id);
+  assert.deepEqual(h3.perEx, { 'Sit-ups': 10, 'Burpees': 10 }); assert.deepEqual(h3.exercises, ['Sit-ups', 'Burpees']);
+  ok('Kombi-Training mit eigener Übung: Wechsel Sit-ups/Burpees, Ansage „Nächster Satz: 5 Burpees“, Summen und Verlauf je Übung');
+  await p3.click('header [data-go=home]'); await p3.waitForSelector('.extiles'); await p3.clock.runFor(1500);
+  const rec3 = await p3.$$eval('.extile[data-exsel]', e => Object.fromEntries(e.map(t => [t.dataset.exsel, !!t.querySelector('.exrec.wait')])));
+  assert.ok(rec3['Burpees'] && rec3['Sit-ups'], JSON.stringify(rec3)); assert.ok(!rec3['Liegestütze'] && !rec3['Superman'], 'andere Gruppen frei');
+  ok('Erholung nach Kombi: Kacheln Burpees (eigene Gruppe) und Sit-ups (Bauch) mit Countdown, andere frei');
+  await p3.click('[data-exsel="Burpees"]'); await p3.waitForSelector('#xp-panel [data-act=xedit]'); await p3.click('#xp-panel [data-act=xedit]');
+  await p3.waitForSelector('.sheet.xedit'); await p3.click('[data-act=xdel]'); await p3.waitForSelector('.xerr');
+  assert.match(await p3.textContent('.xerr'), /Wird in der Kombi „Rumpf & Burpees“ verwendet/);
+  assert.equal((await p3.evaluate(() => JSON.parse(localStorage.getItem('edt.exercises')))).length, 1, 'nicht gelöscht');
+  await p3.click('[data-act=xcancel]');
+  // Verlauf: Kombi-Filter enthält die eigene Übung
+  await p3.click('.tab[data-go=history]'); await p3.waitForSelector('.dev'); await p3.click('[data-dmode=combo]'); await p3.waitForTimeout(150);
+  assert.ok((await p3.$$eval('.devex .chip', e => e.map(x => x.textContent))).includes('Burpees'), 'Filter Burpees im Kombi-Verlauf');
+  await p3.click('.devex [data-dex="Burpees"]'); await p3.waitForTimeout(150);
+  assert.deepEqual(await p3.evaluate(() => window.__rz.devSr.points.map(p => p.value)), [10]);
+  ok('Löschen gesperrt, solange eine Kombi die Übung nutzt; Kombi-Verlauf filterbar nach Burpees');
+  await ctx3.close();
+}
+
 // leere Zustände je Modus
 const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'de-DE', timezoneId: 'Europe/Berlin' });
 const p2 = await ctx2.newPage(); await p2.clock.install({ time: new Date(NOW) }); await p2.goto(base); await p2.waitForSelector('.setup, .extiles');

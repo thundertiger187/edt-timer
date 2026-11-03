@@ -466,3 +466,54 @@ test('Kombi-Einheiten zählen nicht für Rekorde; devSeries trennt Regulär/Komb
   const allL = E.devSeries(h, {}, { now, mode: 'all', exercise: 'Liegestütze' });
   assert.deepEqual(allL.points.map(p => p.value), [340]);
 });
+
+// ---------- v1.8.0 Grundübungen + eigene Übungen ----------
+test('v1.8.0: 8 Grundübungen mit Muskelgruppen, Regeln, Tempo und Vorlage', () => {
+  assert.deepEqual(E.EXERCISES, ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge', 'Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups']);
+  const m = E.musclesOf;
+  assert.equal(m('Ausfallschritte').name, 'Beine/Gesäß'); assert.equal(m('Beckenheben').name, 'Gesäß/hinterer Oberschenkel');
+  assert.equal(m('Superman').name, 'Unterer Rücken'); assert.equal(m('Sit-ups').name, 'Bauch');
+  assert.equal(E.overlaps(m('Ausfallschritte'), m('Kniebeugen')), true); assert.equal(E.overlaps(m('Ausfallschritte'), m('Beckenheben')), true);
+  assert.equal(E.overlaps(m('Kniebeugen'), m('Beckenheben')), false); assert.equal(E.overlaps(m('Superman'), m('Klimmzüge')), false);
+  assert.equal(E.overlaps(m('Sit-ups'), m('Liegestütze')), false); assert.equal(E.overlaps(m('Burpees', 'core'), m('Sit-ups')), true);
+  for (const ex of E.NEW_EXERCISES_180) {
+    assert.ok(E.LEVEL_RULES[ex] && E.SEC_PER_REP[ex], ex);
+    assert.equal(E.TEMPLATES.filter(t => t.exercise === ex).length, 1, ex);
+    assert.equal(E.planFromMax(ex, 30).phases.length, 3);
+  }
+  assert.equal(new Set(E.TEMPLATES.map(t => t.id)).size, E.TEMPLATES.length);
+  assert.equal(E.normalizeWorkout({ exercise: 'X', muscle: 'glutes' }).muscle, 'glutes');
+  assert.equal(E.normalizeWorkout({ exercise: 'X', muscle: 'quatsch' }).muscle, 'own');
+});
+test('v1.8.0: Kombi-Schritte mit eigener Übung; Erholung eigener Übung ohne Muskelgruppe nur mit sich selbst', () => {
+  const c = E.normalizeCombo({ steps: [{ exercise: 'Burpees', reps: 8, restSec: 15 }, { exercise: 'Sit-ups', reps: 12, restSec: 15 }, { exercise: '  ', reps: 5, restSec: 5 }] });
+  assert.deepEqual(c.steps.map(x => x.exercise), ['Burpees', 'Sit-ups', 'Liegestütze']);
+  assert.equal(E.comboAutoName(c.steps).length > 0, true);
+  const T0 = 1e6, ev = [{ type: 'edt', exercise: 'Burpees', muscle: undefined, at: T0 }];
+  assert.ok(E.recoveryLeft(ev, { exercise: 'Burpees', kind: 'edt' }, null, T0 + 60000).leftMs > 0);
+  assert.equal(E.recoveryLeft(ev, { exercise: 'Liegestütze', kind: 'edt' }, null, T0 + 60000).leftMs, 0);
+  assert.ok(JSON.stringify(E.comboWorkout(c)).includes('Burpees'));
+  assert.ok(E.comboPlan(c, () => 2.5).roundSec > 0);
+});
+test('v1.8.0: eigene Übungen aus Workouts ableiten, Grundübungs-Varianten erkennen, Umbenennen in allen Daten', () => {
+  assert.equal(E.baseExercise('situps'), 'Sit-ups'); assert.equal(E.baseExercise('Sit Ups'), 'Sit-ups'); assert.equal(E.baseExercise('Glute Bridge'), 'Beckenheben');
+  assert.equal(E.baseExercise('AUSFALLSCHRITTE'), 'Ausfallschritte'); assert.equal(E.baseExercise('Burpees'), null); assert.equal(E.baseExercise(''), null);
+  const ws = [{ exercise: 'Liegestütze', muscle: 'push' }, { exercise: 'Burpees', muscle: 'own' }, { exercise: 'burpees', muscle: 'legs' }, { exercise: 'Plank', muscle: 'core' }, { exercise: 'Situps', muscle: 'own' }];
+  const l = E.mergeCustomExercises([{ id: 'x1', name: 'Plank', muscle: 'core' }], ws, [{ steps: [{ exercise: 'Hampelmann' }] }]);
+  assert.deepEqual(l.map(x => [x.name, x.muscle]), [['Plank', 'core'], ['Burpees', 'own'], ['Hampelmann', 'own']]);
+  assert.equal(l[0].id, 'x1'); assert.ok(l.every(x => x.id));
+  assert.deepEqual(E.baseRenames(['Situps', 'ausfallschritte', 'Liegestuetze', 'Burpees']), { Situps: 'Sit-ups', ausfallschritte: 'Ausfallschritte' });
+  const data = {
+    workouts: [{ id: 'w', exercise: 'Situps' }],
+    history: [{ id: 'h1', exercise: 'Situps', sets: [] }, { id: 'h2', type: 'combo', exercises: ['Situps', 'Dips'], perEx: { Situps: 20, Dips: 10 }, steps: [{ exercise: 'Situps' }], sets: [{ ex: 'Situps', done: 5 }] }],
+    maxes: { Situps: [{ v: 30, date: '2026-01-01' }] }, tunes: { Situps: { phases: [] } },
+    combos: [{ id: 'c', steps: [{ exercise: 'Situps' }, { exercise: 'Dips' }] }],
+  };
+  const r = E.renameExercises(data, { Situps: 'Sit-ups' });
+  assert.equal(r.workouts[0].exercise, 'Sit-ups'); assert.equal(r.history[0].exercise, 'Sit-ups');
+  assert.deepEqual(r.history[1].exercises, ['Sit-ups', 'Dips']); assert.deepEqual(r.history[1].perEx, { 'Sit-ups': 20, Dips: 10 });
+  assert.equal(r.history[1].steps[0].exercise, 'Sit-ups'); assert.equal(r.history[1].sets[0].ex, 'Sit-ups');
+  assert.deepEqual(Object.keys(r.maxes), ['Sit-ups']); assert.deepEqual(Object.keys(r.tunes), ['Sit-ups']); assert.equal(r.combos[0].steps[0].exercise, 'Sit-ups');
+  assert.ok(r.changed >= 8); assert.equal(data.workouts[0].exercise, 'Situps', 'Eingabe unverändert');
+  assert.equal(E.renameExercises(data, {}).changed, 0);
+});

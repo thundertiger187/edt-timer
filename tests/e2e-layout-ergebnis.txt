@@ -1,6 +1,11 @@
-2026-11-02T20:47:59.534Z http://127.0.0.1:18741/
+2026-11-03T03:23:27.230Z http://127.0.0.1:18741/
+✓ 360x640: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
 ✓ 360x640: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 156/131/161 px
+✓ 375x667: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
 ✓ 375x667: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 183/158/188 px
+✓ 390x844: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
 ✓ 390x844: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 234/234/234 px
+✓ 412x915: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
 ✓ 412x915: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 240/240/240 px
+✓ 844x390: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
 ✓ 844x390: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 240/240/240 px

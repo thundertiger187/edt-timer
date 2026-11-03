@@ -58,7 +58,7 @@ export function copyDay(plan, from, to) {
 export function musclesOfInfo(i) {
   if (!i) return { name: '', muscles: [] };
   if (Array.isArray(i.exercises) && i.exercises.length) {
-    const ms = i.exercises.map(e => musclesOf(e));
+    const ms = i.exercises.map((e, k) => musclesOf(e, i.muscles?.[k]));
     return { name: [...new Set(ms.map(m => m.name))].join(' + '), muscles: [...new Set(ms.flatMap(m => m.muscles))] };
   }
   return musclesOf(i.exercise, i.muscle);

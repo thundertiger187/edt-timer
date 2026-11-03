@@ -65,8 +65,33 @@ for (const [w, h] of VIEWPORTS) {
   await page.evaluate(({ history, maxes }) => {
     localStorage.setItem('edt.history', JSON.stringify(history)); localStorage.setItem('edt.maxes', JSON.stringify(maxes));
     localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, dayTipSeen: true, exSel: 'Liegestütze', asked: ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge'], recNotify: false, sound: false, leadIn: 5 }));
+    localStorage.setItem('edt.exercises', JSON.stringify([{ id: 'x-b', name: 'Burpees', muscle: 'own' }, { id: 'x-k', name: 'Kettlebell Swings', muscle: 'glutes' }]));
   }, { history, maxes });
   await page.reload(); await page.waitForSelector('.extiles');
+  // v1.8.0 Startseite: 8 Grund- + 2 eigene Kacheln – nichts ragt heraus, nichts überlappt, Namen ohne Überlauf
+  await page.clock.runFor(1200); await page.waitForTimeout(100);
+  const rvOff = await page.addStyleTag({ content: '.rv{transform:none!important;transition:none!important}' }); // Scroll-Einblendung (translateY 20 px) für die Messung aus
+  const home = await page.evaluate(() => {
+    const bad = [], vw = innerWidth, tiles = [...document.querySelectorAll('.extiles .extile')], R = e => e.getBoundingClientRect();
+    tiles.forEach((t, i) => { const r = R(t), name = t.dataset.exsel;
+      if (r.left < -0.5 || r.right > vw + 0.5) bad.push(`${name} außerhalb`);
+      for (const s of ['.tf', '.exname', '.tv', '.exmax', '.exbest']) { const e = t.querySelector(s); if (!e) { bad.push(`${name} ${s} fehlt`); continue; } const q = R(e);
+        if (q.left < r.left - 0.5 || q.right > r.right + 0.5 || q.top < r.top - 0.5 || q.bottom > r.bottom + 0.5) bad.push(`${name} ${s} ragt heraus`); }
+      const n = t.querySelector('.exname'); if (n.scrollWidth > n.clientWidth + 1) bad.push(`${name} Name zu breit`);
+      if (!t.classList.contains('cust') && n.scrollHeight > n.clientHeight + 1) bad.push(`${name} Name abgeschnitten`);
+      for (const v of t.querySelectorAll('.tv b, .tv small')) if (v.scrollWidth > v.clientWidth + 1 || R(v).right > r.right + 0.5) bad.push(`${name} Wert „${v.textContent}“ läuft über`);
+      const [m, k] = [R(t.querySelector('.exmax')), R(t.querySelector('.exbest'))]; if (m.bottom > k.top + 0.5) bad.push(`${name} Werte überlappen`);
+      const f = R(t.querySelector('.tf')); if (f.bottom > m.top + 0.5) bad.push(`${name} Figur ∩ Werte`);
+      tiles.slice(i + 1).forEach(u => { const o = R(u); if (Math.min(r.right, o.right) - Math.max(r.left, o.left) > 0.5 && Math.min(r.bottom, o.bottom) - Math.max(r.top, o.top) > 0.5) bad.push(`${name} ∩ ${u.dataset.exsel}`); }); });
+    const add = R(document.querySelector('.extiles .addex')), last = R(tiles.at(-1));
+    if (add.top < last.bottom - 0.5 || add.right > vw + 0.5) bad.push(`„+ Eigene Übung“ falsch platziert (${Math.round(add.top)},${Math.round(add.right)} vs ${Math.round(last.bottom)})`);
+    if (document.documentElement.scrollWidth > vw + 0.5) bad.push('Seite breiter als Bildschirm');
+    return { bad, n: tiles.length, cols: new Set(tiles.map(t => Math.round(R(t).left))).size, h: Math.round(R(tiles[0]).height) };
+  });
+  await rvOff.evaluate(e => e.remove());
+  if (home.bad.length) { fails++; console.log(`✗ ${vp} Startseite: ${home.bad.join('; ')}`); if (!REPORT) assert.fail(`${vp} Startseite: ${home.bad.join('; ')}`); }
+  assert.equal(home.n, 10);
+  ok(`${vp}: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung`, `${home.cols} Spalten, Kachel ${home.h} px`);
   // Training Liegestütz-EDT 5 min
   if (!(await page.$('.extile.open[data-exsel="Liegestütze"]'))) await page.click('[data-exsel="Liegestütze"]');
   await page.waitForSelector('#xp-panel'); await page.click('.card[data-id="tpl-liegestuetz-5"] [data-act=start]'); await page.click('[data-act=plan-start]');

@@ -27,7 +27,7 @@ await page.evaluate(() => {
 await page.reload(); await page.waitForSelector('.extiles');
 
 // ---------- Strichmännchen ----------
-assert.equal(await page.$$eval('.extile svg.fig[data-anim]', e => e.length), 4);
+assert.equal(await page.$$eval('.extile svg.fig[data-anim]', e => e.length), 8); // v1.8.0: 8 Grundübungen
 const pts = () => page.$eval('.extile svg.fig[data-fig="Liegestütze"] [data-k=arm]', e => e.getAttribute('points'));
 const seen = new Set(); for (let i = 0; i < 4; i++) { seen.add(await pts()); await page.clock.runFor(300); }
 assert.ok(seen.size >= 3, [...seen].join(' | ')); const [a1, a2] = [...seen];
@@ -179,9 +179,9 @@ ok('Wochenplan in Export/Import enthalten');
   await p2.waitForSelector('.setup');
   await p2.evaluate(() => localStorage.setItem('edt.settings', JSON.stringify({ setupDone: true, planVer: 2, exSel: 'Liegestütze', asked: ['Liegestütze'], anim: 'auto' })));
   await p2.reload(); await p2.waitForSelector('.extiles'); // v1.6.1: Einstellung „Automatisch“ folgt dem System
-  assert.equal(await p2.$$eval('.extile svg.fig.static', e => e.length), 4);
+  assert.equal(await p2.$$eval('.extile svg.fig.static', e => e.length), 8);
   assert.equal(await p2.$$eval('svg.fig[data-anim]', e => e.length), 0);
-  assert.equal(await p2.$$eval('.extile svg.fig.static .fbody.ghost', e => e.length), 4);
+  assert.equal(await p2.$$eval('.extile svg.fig.static .fbody.ghost', e => e.length), 8);
   await p2.screenshot({ path: path.join(SCREENS, '34_reduced_motion_start.png') });
   await p2.goto(base + '?w=tpl-liegestuetz-5'); await p2.waitForSelector('svg.fig.planfig.static');
   assert.equal(await p2.$$eval('svg.fig[data-anim]', e => e.length), 0);

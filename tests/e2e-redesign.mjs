@@ -63,14 +63,14 @@ assert.equal(mini.length, 2); assert.match(mini[0], /^done:08:00\s*Liegestütze\
 assert.equal(await page.$$eval('.nx .wk > div', e => e.length), 7);
 ok('Heute: Header „Training“ + Datum, Karte „Als Nächstes · 19:00“ Klimmzüge, ein Start-Button, Zeilen erledigt/verpasst, Wochenpunkte', mini.join(' | '));
 const tiles = await page.$$eval('.extiles .extile:not(.own)', e => e.map(x => ({ n: x.querySelector('.exname').textContent, m: x.querySelector('.exmax').textContent, b: x.querySelector('.exbest').textContent, h: Math.round(x.getBoundingClientRect().height), fig: !!x.querySelector('.tf .tilefig'), txt: x.textContent })));
-assert.equal(tiles.length, 4); assert.equal(new Set(tiles.map(t => t.h)).size, 1, 'gleiche Kachelhöhe');
+assert.equal(tiles.length, 8); assert.equal(new Set(tiles.map(t => t.h)).size, 1, 'gleiche Kachelhöhe'); // v1.8.0: 8 Grundübungen
 const T = Object.fromEntries(tiles.map(t => [t.n, t]));
 assert.equal(T['Liegestütze'].m, 'Max am Stück 28'); assert.equal(T['Liegestütze'].b, 'Rekord 5 min 117');
 assert.equal(T['Dips'].m, 'Max am Stück Test offen'); assert.equal(T['Kniebeugen'].b, 'Rekord 5 min –');
 for (const t of tiles) { assert.ok(t.fig); assert.doesNotMatch(t.txt, /erholt/); }
-assert.equal(await page.$$eval('.extile.own', e => e.length), 1);
+assert.equal(await page.$$eval('.extile.own', e => e.length), 0); assert.equal((await page.textContent('.extiles .addex')).trim(), '+ Eigene Übung');
 assert.equal(await page.$$eval('#xp-panel', e => e.length), 0, 'anfangs zugeklappt');
-ok('Übungen: 2×2 Kacheln gleich hoch, Figur in eigener Box, „Max am Stück“/„Rekord 5 min“, Zeile „Eigene Übungen“', tiles.map(t => `${t.n}: ${t.m} · ${t.b}`).join(' | '));
+ok('Übungen: 8 Kacheln (2 Spalten) gleich hoch, Figur in eigener Box, „Max am Stück“/„Rekord 5 min“, Knopf „+ Eigene Übung“', tiles.map(t => `${t.n}: ${t.m} · ${t.b}`).join(' | '));
 const recent = await page.$$eval('.list .lr', e => e.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
 assert.equal(recent.length, 2); assert.match(recent[0], /^Liegestütz-EDT 5 min\s*Sa\., 31\.10\. · 23 Sätze · 23\/min\s*115$/);
 ok('Zuletzt: zwei letzte Einheiten', recent.join(' | '));
@@ -97,9 +97,10 @@ let p2 = await page.evaluate(() => { const p = document.querySelectorAll('#xp-pa
 assert.deepEqual(p2, { n: 1, panel: 'Klimmzüge', idx: 4 }); ok('Nur ein Panel offen, Klimmzüge unter zweiter Reihe');
 await page.click('[data-exsel="Klimmzüge"]'); await page.waitForTimeout(400);
 assert.equal(await page.$$eval('#xp-panel', e => e.length), 0); ok('Zweites Tippen klappt zu');
-await page.click('[data-exsel="__own"]'); await page.waitForSelector('#xp-panel[data-panel="__own"]');
-assert.match(await page.textContent('#xp-panel'), /\+ Neues Workout/); await page.click('[data-exsel="__own"]'); await page.waitForTimeout(400);
-ok('Eigene Übungen klappt auf/zu');
+await page.click('.addex'); await page.waitForSelector('.sheet.xedit #x-name');
+assert.equal(await page.$$eval('.xedit .xmus .chip', e => e.length), 7); await page.click('[data-act=xcancel]'); await page.waitForTimeout(200);
+assert.equal(await page.$$eval('.sheet.xedit', e => e.length), 0);
+ok('„+ Eigene Übung“ öffnet das Anlege-Blatt (Name + 7 Muskelgruppen), Abbrechen schließt')
 
 // --- Kein Wochenplan: letzte Einheit + Hinweis
 await page.evaluate(() => localStorage.setItem('edt.plan', JSON.stringify({ entries: [], alarmBefore: 10, remind: false, removed: [], exported: [], seq: 0 })));

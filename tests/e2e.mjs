@@ -28,7 +28,7 @@ const P3 = ['Phase 1 · 0:00–2:20 · 10 Wdh / 15 s Pause, Sätze 1–4', 'Phas
 await page.goto(base); await page.waitForSelector('.setup');
 assert.equal(await page.title(), 'EDT Timer');
 assert.match(await page.textContent('.setup .q'), /Fitnesstest: Übung wählen/);
-assert.deepEqual(await page.$$eval('.setup .extile .exname', e => e.map(x => x.textContent)), ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge']);
+assert.deepEqual(await page.$$eval('.setup .extile .exname', e => e.map(x => x.textContent)), ['Liegestütze', 'Kniebeugen', 'Dips', 'Klimmzüge', 'Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups']); // v1.8.0: 8 Grundübungen
 await shot('01_setup_uebung_waehlen.png');
 ok('Erster Start ohne Maximum → Setup „Fitnesstest: Übung wählen“', base);
 await page.click('[data-act=assess-pick][data-aex="Liegestütze"]'); await page.waitForSelector('.howto');

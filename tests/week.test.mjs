@@ -114,3 +114,19 @@ test('v1.7.0 musclesOfInfo: Kombi umfasst alle Muskelgruppen ihrer Übungen', ()
   const names = [].concat(g).map(x => x.name ?? x).join(' ');
   assert.match(names, /Brust/); assert.match(names, /Rücken/);
 });
+
+test('v1.8.0 Figuren der neuen Grundübungen: Bewegung plausibel', () => {
+  for (const ex of ['Ausfallschritte', 'Beckenheben', 'Superman', 'Sit-ups']) assert.ok(F.FIGURES.includes(ex), ex);
+  const A0 = F.poseOf('Ausfallschritte', 0), A1 = F.poseOf('Ausfallschritte', 1);
+  assert.ok(A1.hip.y - A0.hip.y > 10, 'Hüfte senkt sich'); assert.deepEqual(A0.ft, A1.ft); assert.deepEqual(A0.ft2, A1.ft2);
+  assert.ok(Math.abs(dist(A1.hip, A1.kn2) - 20) < 0.01 && Math.abs(dist(A1.kn2, A1.ft2) - 19) < 0.01, 'hinteres Bein feste Längen');
+  assert.ok(A1.kn2.y > 80, 'hinteres Knie Richtung Boden');
+  assert.equal((F.figureSvg('Ausfallschritte').match(/<polyline/g) || []).length, 4, 'zwei Beine');
+  const B0 = F.poseOf('Beckenheben', 0), B1 = F.poseOf('Beckenheben', 1);
+  assert.ok(B0.hip.y - B1.hip.y > 10, 'Hüfte hebt sich'); assert.deepEqual(B0.sh, B1.sh); assert.deepEqual(B0.ft, B1.ft);
+  const S0 = F.poseOf('Superman', 0), S1 = F.poseOf('Superman', 1);
+  assert.deepEqual(S0.hip, S1.hip); assert.ok(S0.ha.y - S1.ha.y > 8, 'Arme heben'); assert.ok(S0.ft.y - S1.ft.y > 6, 'Beine heben');
+  const U0 = F.poseOf('Sit-ups', 0), U1 = F.poseOf('Sit-ups', 1);
+  assert.ok(U0.sh.y - U1.sh.y > 20, 'Oberkörper richtet sich auf'); assert.deepEqual(U0.hip, U1.hip); assert.ok(U0.sh.y > 80, 'start liegend');
+  for (const ex of ['Beckenheben', 'Superman', 'Sit-ups']) for (const p of [0, 0.5, 1]) { const j = F.poseOf(ex, p); for (const k of ['head', 'sh', 'hip', 'kn', 'ft', 'el', 'ha']) assert.ok(j[k].y <= 91, `${ex} ${k} über dem Boden`); }
+});
