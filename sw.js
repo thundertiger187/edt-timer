@@ -1,7 +1,7 @@
 // Offline-Cache. Version wird beim Build gesetzt.
 // v1.6.1: Startseite (index.html) zuerst aus dem Netz, damit eine neue Version sofort lädt; Skripte/CSS tragen ?v=<Build>
 // und kommen aus dem Cache dieser Version. Beim Installieren wird am HTTP-Cache vorbei geladen (cache: 'reload').
-const VERSION = '1.7.0-4a49562c', CACHE = 'edt-timer-' + VERSION, Q = '?v=' + VERSION.split('-')[1];
+const VERSION = '1.8.0-f87084c0', CACHE = 'edt-timer-' + VERSION, Q = '?v=' + VERSION.split('-')[1];
 const ASSETS = ['style.css', 'app.js', 'engine.js', 'audio.js', 'store.js', 'figures.js', 'week.js', 'fx.js'];
 const FILES = ['./', 'index.html', ...ASSETS.map(f => f + Q), 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png'];

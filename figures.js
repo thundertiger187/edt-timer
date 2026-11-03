@@ -64,6 +64,47 @@ const POSES = {
     const head = P(sh.x + SEG.neck * Math.sin(0.35 * p + 0.05), sh.y - SEG.neck * Math.cos(0.35 * p + 0.05));
     return { head, sh, el, ha, hip, kn, ft, vb: '0 0 120 118', scene: `<line x1="22" y1="${bar}" x2="98" y2="${bar}"/><line x1="22" y1="${bar}" x2="22" y2="4"/><line x1="98" y1="${bar}" x2="98" y2="4"/>` };
   },
+  // v1.8.0 Ausfallschritte (Seitansicht, Schrittstellung): beide Füße fest, Hüfte senkt sich senkrecht,
+  // vorderes Knie über dem Fuß, hinteres Knie Richtung Boden. Zweites Bein (leg2) = hinteres Bein.
+  'Ausfallschritte': p => {
+    const floor = 90, ft = P(80, floor - 2), ft2 = P(36, floor - 4);
+    const hip = P(lerp(58, 56, p), lerp(56, 69, p));
+    const kn = ik(hip, ft, SEG.th, SEG.sh, P(1, -0.4)), kn2 = ik(hip, ft2, SEG.th, SEG.sh, P(0.35, 1));
+    const sh = add(hip, SEG.to, -Math.PI / 2 + 0.05); // Oberkörper aufrecht
+    const el = add(sh, SEG.ua, Math.PI / 2 + 0.08), ha = add(el, SEG.fa, Math.PI / 2 - 0.1); // Arme hängen seitlich
+    const head = P(sh.x + 1, sh.y - SEG.neck);
+    return { head, sh, el, ha, hip, kn, ft, toe: P(ft.x + 7, floor), hip2: hip, kn2, ft2, toe2: P(ft2.x - 5, floor), scene: `<line x1="2" y1="${floor + 1}" x2="118" y2="${floor + 1}"/>` };
+  },
+  // Beckenheben (Glute Bridge): Rückenlage, Schultern und Füße fest am Boden, Hüfte hebt sich bis Schulter–Hüfte–Knie eine Linie bilden
+  'Beckenheben': p => {
+    const floor = 90, sh = P(30, floor - 4.5), ft = P(88, floor - 2.5);
+    const a = -lerp(0.02, 0.5, p); // Oberkörper dreht um die Schultern
+    const hip = add(sh, SEG.to, a);
+    const kn = ik(hip, ft, SEG.th, SEG.sh, P(0, -1));
+    const head = P(sh.x - SEG.neck, floor - SEG.head - 0.5);
+    const el = add(sh, SEG.ua, 0.12), ha = add(el, SEG.fa, 0.02); // Arme flach neben dem Körper
+    return { head, sh, el, ha, hip, kn, ft, toe: P(ft.x + 7, floor), scene: `<line x1="2" y1="${floor + 1}" x2="118" y2="${floor + 1}"/>` };
+  },
+  // Superman: Bauchlage, Arme nach vorn gestreckt; Arme, Brust und Beine heben gleichzeitig ab, Hüfte bleibt am Boden
+  'Superman': p => {
+    const floor = 90, hip = P(46, floor - 4);
+    const t = -lerp(0.02, 0.22, p), lg = lerp(0.02, 0.2, p), ar = t - lerp(0.12, 0.3, p);
+    const sh = add(hip, SEG.to, t);
+    const kn = add(hip, SEG.th, Math.PI + lg), ft = add(kn, SEG.sh, Math.PI + lg * 1.1);
+    const el = add(sh, SEG.ua, ar - 0.25), ha = add(el, SEG.fa, ar - 0.1); // Arme über dem Kopf nach vorn
+    const head = add(sh, SEG.neck - 1.5, t + 0.12); // Kopf in Verlängerung des Rumpfs, Blick zum Boden
+    return { head, sh, el, ha, hip, kn, ft, scene: `<line x1="2" y1="${floor + 1}" x2="118" y2="${floor + 1}"/>` };
+  },
+  // Sit-ups: Rückenlage, Knie gebeugt, Füße fest; Oberkörper rollt aus der Rückenlage bis aufrecht, Arme nach vorn
+  'Sit-ups': p => {
+    const floor = 90, hip = P(62, floor - 4.5), ft = P(90, floor - 2.5);
+    const t = Math.PI + lerp(0.03, 1.22, p); // π = flach nach links, π + π/2 = senkrecht
+    const sh = add(hip, SEG.to, t);
+    const kn = ik(hip, ft, SEG.th, SEG.sh, P(0, -1));
+    const ar = lerp(-0.22, -0.08, p), el = add(sh, SEG.ua, ar), ha = add(el, SEG.fa, ar);
+    const head = add(sh, SEG.neck, t + lerp(0.35, 0.25, p)); // Kinn zur Brust
+    return { head, sh, el, ha, hip, kn, ft, toe: P(ft.x + 7, floor), scene: `<line x1="2" y1="${floor + 1}" x2="118" y2="${floor + 1}"/>` };
+  },
 };
 export const FIGURES = Object.keys(POSES);
 export const hasFigure = ex => !!POSES[ex];
@@ -72,11 +113,11 @@ export const poseOf = (ex, p) => POSES[ex](p);
 const f1 = n => Math.round(n * 10) / 10;
 const pts = (...a) => a.filter(Boolean).map(q => `${f1(q.x)},${f1(q.y)}`).join(' ');
 function bodyParts(j) {
-  return { arm: pts(j.sh, j.el, j.ha), leg: pts(j.hip, j.kn, j.ft, j.toe), heel: j.heel ? pts(j.heel, j.toe) : '', torso: pts(j.head && P(j.sh.x + (j.head.x - j.sh.x) * 0.45, j.sh.y + (j.head.y - j.sh.y) * 0.45), j.sh, j.hip) };
+  return { arm: pts(j.sh, j.el, j.ha), leg: pts(j.hip, j.kn, j.ft, j.toe), leg2: j.kn2 ? pts(j.hip2 || j.hip, j.kn2, j.ft2, j.toe2) : '', heel: j.heel ? pts(j.heel, j.toe) : '', torso: pts(j.head && P(j.sh.x + (j.head.x - j.sh.x) * 0.45, j.sh.y + (j.head.y - j.sh.y) * 0.45), j.sh, j.hip) };
 }
 function bodySvg(j, cls = '') {
   const b = bodyParts(j);
-  return `<g class="fbody ${cls}"><polyline data-k="torso" points="${b.torso}"/><polyline data-k="leg" points="${b.leg}"/>${b.heel ? `<polyline data-k="heel" points="${b.heel}"/>` : ''}<polyline data-k="arm" points="${b.arm}"/><circle data-k="head" cx="${f1(j.head.x)}" cy="${f1(j.head.y)}" r="${SEG.head}"/></g>`;
+  return `<g class="fbody ${cls}"><polyline data-k="torso" points="${b.torso}"/>${b.leg2 ? `<polyline data-k="leg2" class="back" points="${b.leg2}"/>` : ''}<polyline data-k="leg" points="${b.leg}"/>${b.heel ? `<polyline data-k="heel" points="${b.heel}"/>` : ''}<polyline data-k="arm" points="${b.arm}"/><circle data-k="head" cx="${f1(j.head.x)}" cy="${f1(j.head.y)}" r="${SEG.head}"/></g>`;
 }
 // v1.6.1: Bewegungsstufe aus html[data-motion] (Einstellung „Animationen“); ohne Angabe System folgen
 const reduced = () => { const m = typeof document !== 'undefined' && document.documentElement?.dataset?.motion; return m ? m !== 'full' : typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; };

@@ -1,5 +1,5 @@
 // Wochenplan: Einträge je Wochentag, Abstandsprüfung gegen die Erholung, Erledigt-Abgleich, Kalender-Export (.ics).
-import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=4a49562c';
+import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=f87084c0';
 
 export const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 export const DAYS_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -58,7 +58,7 @@ export function copyDay(plan, from, to) {
 export function musclesOfInfo(i) {
   if (!i) return { name: '', muscles: [] };
   if (Array.isArray(i.exercises) && i.exercises.length) {
-    const ms = i.exercises.map(e => musclesOf(e));
+    const ms = i.exercises.map((e, k) => musclesOf(e, i.muscles?.[k]));
     return { name: [...new Set(ms.map(m => m.name))].join(' + '), muscles: [...new Set(ms.flatMap(m => m.muscles))] };
   }
   return musclesOf(i.exercise, i.muscle);

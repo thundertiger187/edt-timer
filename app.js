@@ -1,11 +1,11 @@
-import * as E from './engine.js?v=4a49562c';
-import * as A from './audio.js?v=4a49562c';
-import { store, migrated } from './store.js?v=4a49562c';
-import { figureSvg, animateFigures } from './figures.js?v=4a49562c';
-import * as W from './week.js?v=4a49562c';
-import * as FX from './fx.js?v=4a49562c';
+import * as E from './engine.js?v=f87084c0';
+import * as A from './audio.js?v=f87084c0';
+import { store, migrated } from './store.js?v=f87084c0';
+import { figureSvg, animateFigures } from './figures.js?v=f87084c0';
+import * as W from './week.js?v=f87084c0';
+import * as FX from './fx.js?v=f87084c0';
 
-const VERSION = '1.7.0-4a49562c';
+const VERSION = '1.8.0-f87084c0';
 const $ = (s, r = document) => r.querySelector(s);
 const app = $('#app');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -14,12 +14,16 @@ const de = (n, d = 1) => Number(n).toLocaleString('de-DE', { maximumFractionDigi
 const now = () => Date.now();
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+// v1.8.0: einmalig Sicherung (edt.backup-1.8.0) + neue Vorlagen; bei jedem Start eigene Übungen abgleichen
+store.upgrade180();
+const heal180 = store.healExercises();
 const st = {
   view: 'home', workouts: store.workouts(), history: store.history(), settings: store.settings(),
   session: null, lead: null, draft: null, result: null, resultFrom: 'home', histFilter: null,
   adj: 0, layoutKey: '', sheet: null, partialVal: 0, installEvt: null, maxes: store.maxes(), assess: null,
   tunes: store.tunes(), plan: null, tuneSel: 0, week: W.normalizePlan(store.plan()), wcopy: null,
   combos: store.combos(), cdraft: null, crec: null, devMode: 'reg',
+  exercises: heal180.list, xdraft: null,
 };
 window.__rz = st;
 
@@ -30,6 +34,14 @@ const bestOf = id => st.history.filter(h => h.workoutId === id && !h.aborted).re
 const workoutById = id => st.workouts.find(w => w.id === id);
 const comboById = id => st.combos.find(c => c.id === id);
 const maxOf = ex => { const l = st.maxes[ex]; return l && l.length ? l[l.length - 1] : null; };
+// v1.8.0 eigene Übungen: Liste st.exercises [{ id, name, muscle }], Kacheln nach den Grundübungen
+const isBase = ex => E.EXERCISES.includes(ex);
+const customOf = n => st.exercises.find(x => x.name === n);
+const allEx = () => [...E.EXERCISES, ...st.exercises.map(x => x.name)];
+const MUSCLE_LABEL = { push: 'Brust/Trizeps/Schulter', pull: 'Rücken/Bizeps', legs: 'Beine', glutes: 'Gesäß/hint. Oberschenkel', lowback: 'Unterer Rücken', core: 'Bauch', own: 'Nur diese Übung' };
+// Trennstellen für lange Namen in schmalen Kacheln (360 px)
+const SHY = { 'Ausfallschritte': 'Ausfall&shy;schritte', 'Beckenheben': 'Becken&shy;heben' };
+const mono = n => { const w = String(n).trim().split(/[\s\-\/]+/).filter(Boolean); return (w.length > 1 ? [w[0], w[1]] : [w[0] || '?']).map(x => Array.from(x)[0]).join('').toUpperCase(); };
 // Tempo-Schätzung: gemessen aus den letzten Einheiten, sonst Standardwert der Übung
 const testPace = mx => mx && mx.source === 'test' && mx.durMs > 0 && mx.v > 0 ? Math.round(Math.min(8, Math.max(0.8, mx.durMs / 1000 / mx.v)) * 10) / 10 : null;
 const tempoOf = ex => {
@@ -44,7 +56,7 @@ const samePhases = (a, b) => JSON.stringify(E.normalizeWorkout({ phases: a }).ph
 const sec = v => `${de(v)} s`;
 // ---------- Erholung je Muskelgruppe ----------
 const hhmm = t => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-const muscleFor = ex => st.workouts.find(w => w.exercise === ex)?.muscle;
+const muscleFor = ex => customOf(ex)?.muscle ?? st.workouts.find(w => w.exercise === ex)?.muscle;
 const recCfg = () => ({ afterTest: st.settings.recAfterTest, betweenEdt: st.settings.recEdt, betweenTests: st.settings.recTests });
 function recEvents() {
   const ev = [];
@@ -52,7 +64,7 @@ function recEvents() {
   for (const h of st.history) if (h.total > 0) {
     const at = Date.parse(h.date) + (h.elapsedMs || 0);
     if (E.isCombo(h)) { for (const ex of h.exercises || Object.keys(h.perEx || {})) if ((h.perEx?.[ex] ?? 1) > 0) ev.push({ type: 'edt', exercise: ex, muscle: muscleFor(ex), at }); } // v1.7.0: jede Übung der Kombi
-    else ev.push({ type: 'edt', exercise: h.exercise, muscle: h.muscle ?? muscleFor(h.exercise), at });
+    else ev.push({ type: 'edt', exercise: h.exercise, muscle: customOf(h.exercise)?.muscle ?? h.muscle ?? muscleFor(h.exercise), at }); // eigene Übung: aktuelle Muskelgruppe
   }
   return ev;
 }
@@ -130,23 +142,22 @@ function tabs(active) {
 const phaseChips = ph => ph.map(p => `<span class="ph"><b>${p.reps}</b> Wdh · ${p.restSec} s · ${p.rounds == null ? 'bis Ende' : '×' + p.rounds}</span>`).join('');
 const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const todayLabel = () => { const d = new Date(now()); return `${DAYS_DE[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`; };
-// Offenes Übungs-Panel (nur für diese Sitzung): Übungsname, '__own' oder null
+// Offenes Übungs-Panel (nur für diese Sitzung): Übungsname (Grund- oder eigene Übung) oder null
 const openKey = () => st.openEx ?? null;
 function exTile(ex, open) {
-  const mx = maxOf(ex), b = best5Of(ex), r = recOf(ex, 'edt');
-  return `<button class="extile ${open ? 'open' : ''}" data-exsel="${ex}" aria-expanded="${open}" aria-controls="xp-panel">
-    <span class="tf">${figureSvg(ex, 'tilefig')}</span>
-    <span class="exname">${ex}</span>
+  const mx = maxOf(ex), b = best5Of(ex), r = recOf(ex, 'edt'), cu = !isBase(ex);
+  return `<button class="extile ${cu ? 'cust' : ''} ${open ? 'open' : ''}" data-exsel="${esc(ex)}" aria-expanded="${open}" aria-controls="xp-panel">
+    ${cu ? `<span class="tf mono" aria-hidden="true">${esc(mono(ex))}</span>` : `<span class="tf">${figureSvg(ex, 'tilefig')}</span>`}
+    <span class="exname" title="${esc(ex)}">${SHY[ex] || esc(ex)}</span>
     <span class="tv"><span class="exmax ${mx ? '' : 'need'}"><small>Max am Stück</small> <b>${mx ? mx.v : 'Test offen'}</b></span><span class="exbest"><small>Rekord ${REC_MIN} min</small> <b>${b ? b.total : '–'}</b></span></span>
     ${r.leftMs > 0 ? `<span class="exrec wait">${cd(r.until, 'Erholung noch ', '')}</span>` : '<span class="exrec ph" aria-hidden="true">&nbsp;</span>'}</button>`;
 }
 function workoutCard(w) {
   const tn = tuneOf(w.exercise), ew = tn ? { ...w, phases: phasesOf(w) } : w;
   const b = bestOf(w.id), plan = E.simulate(ew, tempoOf(w.exercise).spr).total, wm = w.auto.enabled ? maxOf(w.exercise) : null;
-  const own = !E.EXERCISES.includes(w.exercise), rs = own ? recState(w.exercise, w.muscle, true) : '';
+  // v1.8.0: Rekord und Erholung eigener Übungen stehen jetzt auf deren Kachel
   return `<article class="card" data-id="${w.id}">
       <div class="card-head"><h3>${esc(w.name)}</h3><span class="dur">${w.limitMin} min</span></div>
-      ${own ? `<div class="cardrec"><span class="tag">${esc(w.exercise)}</span>${best5Html(w.exercise)}${rs ? ` · ${esc(E.musclesOf(w.exercise, w.muscle).name)}: ${rs}` : ''}</div>` : ''}
       <div class="phases">${phaseChips(ew.phases)}</div>
       <div class="meta">${tn ? `<span class="pill">Phasen angepasst ${dShort(tn.date)}</span>` : wm ? `<span class="pill">aus Max ${wm.v}</span>` : ''}${w.adapt.enabled ? `<span class="pill">Auto-Anpassung</span>` : ''}${w.countMode === 'tap' ? '<span class="pill">Tap-Zählung</span>' : ''}</div>
       <div class="card-foot">
@@ -157,14 +168,15 @@ function workoutCard(w) {
       </div></article>`;
 }
 function exPanel(key, anim) {
-  const own = key === '__own', list = st.workouts.filter(w => own ? !E.EXERCISES.includes(w.exercise) : w.exercise === key);
-  const m = own ? null : maxOf(key), col = own ? 'own' : E.EXERCISES.indexOf(key) % 2 ? 'r' : 'l';
+  const def = customOf(key), list = st.workouts.filter(w => w.exercise === key);
+  const m = maxOf(key), col = allEx().indexOf(key) % 2 ? 'r' : 'l';
   // Fitnesstest-Box ohne die Max-Zahl (steht schon auf der Kachel)
-  const box = own ? '' : m
-    ? `<div class="maxbar"><div><small>Fitnesstest</small><span>${dShort(m.date)} · ${m.source === 'test' ? 'getestet' : 'eingegeben'}</span></div><button class="btn ghost sm" data-act="assess" data-aex="${key}">Test wiederholen</button></div>`
-    : `<div class="askcard"><b>Fitnesstest ${esc(key)}</b><p>Maximale saubere Wiederholungen bis zum Muskelversagen. Daraus entstehen Satzgröße, Pausen und 3 Phasen.</p><button class="btn primary wide" data-act="assess" data-aex="${key}">Fitnesstest starten</button></div>`;
+  const box = m
+    ? `<div class="maxbar"><div><small>Fitnesstest</small><span>${dShort(m.date)} · ${m.source === 'test' ? 'getestet' : 'eingegeben'}</span></div><button class="btn ghost sm" data-act="assess" data-aex="${esc(key)}">Test wiederholen</button></div>`
+    : `<div class="askcard"><b>Fitnesstest ${esc(key)}</b><p>Maximale saubere Wiederholungen bis zum Muskelversagen. Daraus entstehen Satzgröße, Pausen und 3 Phasen.</p><button class="btn primary wide" data-act="assess" data-aex="${esc(key)}">Fitnesstest starten</button></div>`;
   return `<div class="xpanel col-${col} ${anim ? 'anim' : ''}" id="xp-panel" data-panel="${esc(key)}"><div class="xp-in"><div class="xp-body">
-    <div class="xp-h"><b>${own ? 'Eigene Übungen' : esc(key)}</b><span>${list.length} ${list.length === 1 ? 'Workout' : 'Workouts'}</span></div>
+    <div class="xp-h"><b>${esc(key)}</b><span>${list.length} ${list.length === 1 ? 'Workout' : 'Workouts'}</span></div>
+    ${def ? `<div class="xp-own"><span>Eigene Übung · ${def.muscle === 'own' ? 'eigene Erholung' : esc(MUSCLE_LABEL[def.muscle])}</span><button class="lk" data-act="xedit" data-xid="${def.id}">Übung bearbeiten</button></div>` : ''}
     ${box}
     ${list.map(workoutCard).join('') || `<p class="muted">Noch kein Workout für diese Auswahl.</p>`}
     <button class="btn add" data-act="new">+ Neues Workout</button></div></div></div>`;
@@ -224,31 +236,80 @@ function recentList() {
 }
 function viewHome() {
   const open = openKey(), anim = st.panelAnim; st.panelAnim = false;
-  const tiles = E.EXERCISES.map(ex => exTile(ex, open === ex));
+  const exs = allEx(), tiles = exs.map(ex => exTile(ex, open === ex));
   let grid = '';
   for (let i = 0; i < tiles.length; i += 2) {
     grid += tiles[i] + (tiles[i + 1] || '');
-    if (open && E.EXERCISES.slice(i, i + 2).includes(open)) grid += exPanel(open, anim);
+    if (open && exs.slice(i, i + 2).includes(open)) grid += exPanel(open, anim);
   }
-  grid += `<button class="extile own ${open === '__own' ? 'open' : ''}" data-exsel="__own" aria-expanded="${open === '__own'}"><span>Eigene Übungen</span><span class="chev">›</span></button>`;
-  if (open === '__own') grid += exPanel('__own', anim);
+  grid += `<button class="addex" data-act="xnew">+ Eigene Übung</button>`;
   return `<header class="hd"><h1>Training</h1><span>${todayLabel()}</span></header>
   <main class="scroll home">
     <section class="sec"><div class="sh"><h2>Heute</h2><button class="lk" data-go="week">Wochenplan ›</button></div>${heroCard()}</section>
     <section class="sec"><div class="sh"><h2>Übungen</h2><button class="lk" data-act="fitness" data-then="home">Fitnesstest ›</button></div><div class="extiles">${grid}</div></section>
     <section class="sec kombi"><div class="sh"><h2>Kombi</h2>${st.combos.length ? '<button class="lk" data-act="combo-new" aria-label="Neue Kombi anlegen">+ Kombi</button>' : ''}</div>${comboList()}</section>
     <section class="sec"><div class="sh"><h2>Zuletzt</h2><button class="lk" data-go="history">Verlauf ›</button></div>${recentList()}</section>
-  </main>${tabs('home')}${comboEditSheet()}${comboRecSheet()}`;
+  </main>${tabs('home')}${comboEditSheet()}${comboRecSheet()}${xEditSheet()}`;
 }
 // Auf-/Zuklappen der Übungs-Panels (eines offen); Animation nur ohne prefers-reduced-motion
 const reducedMotion = () => FX.reduced(); // v1.6.1: Einstellung „Animationen“ + System
 function toggleEx(key) {
   const cur = openKey(), el = $('#xp-panel');
-  const apply = () => { st.openEx = cur === key ? null : key; if (st.openEx && st.openEx !== '__own') { st.settings.exSel = key; store.saveSettings(st.settings); } else if (st.openEx === '__own') { st.settings.exSel = '__own'; store.saveSettings(st.settings); }
+  const apply = () => { st.openEx = cur === key ? null : key; if (st.openEx) { st.settings.exSel = key; store.saveSettings(st.settings); }
     st.panelAnim = !!st.openEx && !reducedMotion(); render();
     if (st.openEx) requestAnimationFrame(() => { const t = $(`[data-exsel="${CSS.escape(st.openEx)}"]`); t?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }); }); };
   // Zuklappen animiert; Wechsel auf eine andere Kachel sofort (öffnet dort animiert)
   if (el && cur === key && !reducedMotion()) { el.classList.add('closing'); el.addEventListener('animationend', apply, { once: true }); setTimeout(() => st.openEx === cur && apply(), 400); } else apply();
+}
+
+// ---------- Eigene Übungen (v1.8.0): anlegen, umbenennen, Muskelgruppe, löschen ----------
+function xErr(x) {
+  if (!x.name) return 'Name fehlt.';
+  const b = E.baseExercise(x.name); if (b) return `„${b}“ ist bereits eine Grundübung.`;
+  if (st.exercises.some(e => e.id !== x.id && E.exKey(e.name) === E.exKey(x.name))) return 'Diese Übung gibt es schon.';
+  if (!E.exKey(x.name)) return 'Der Name braucht mindestens einen Buchstaben.';
+  return '';
+}
+function xEditSheet() {
+  if (st.sheet !== 'xedit' || !st.xdraft) return '';
+  const x = st.xdraft, anim = st.xAnim; st.xAnim = false;
+  return `<div class="sheet-bg ${anim ? '' : 'noanim'}"><div class="sheet xedit ${anim ? '' : 'noanim'}" role="dialog" aria-label="${x.isNew ? 'Eigene Übung anlegen' : 'Übung bearbeiten'}">
+    <h3>${x.isNew ? 'Eigene Übung' : 'Übung bearbeiten'}</h3>
+    <label class="cfield"><small>Name</small><input id="x-name" type="text" maxlength="40" value="${esc(x.name)}" placeholder="z. B. Burpees" aria-label="Name der Übung" autocomplete="off"></label>
+    <div class="cfield"><small>Muskelgruppe · bestimmt die Erholung</small><div class="chips xmus" role="radiogroup" aria-label="Muskelgruppe">${E.MUSCLE_CHOICES.map(k => `<button class="chip ${x.muscle === k ? 'on' : ''}" role="radio" aria-checked="${x.muscle === k}" data-act="xmus" data-xm="${k}">${MUSCLE_LABEL[k]}</button>`).join('')}</div></div>
+    ${x.err ? `<p class="xerr" role="alert">${esc(x.err)}</p>` : ''}
+    <p class="muted sm">${x.isNew ? 'Erscheint als eigene Kachel unter Übungen und ist in Kombis wählbar.' : 'Umbenennen ändert auch Workouts, Kombis, Verlauf und Fitnesstest-Werte.'}</p>
+    <button class="btn primary wide big" data-act="xsave">${x.isNew ? 'Anlegen' : 'Speichern'}</button>
+    ${x.isNew ? '' : '<button class="btn ghost wide danger" data-act="xdel">Übung löschen</button>'}
+    <button class="btn ghost wide" data-act="xcancel">Abbrechen</button>
+  </div></div>`;
+}
+const reloadData = () => { st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.combos = store.combos(); st.exercises = store.exercises(); };
+function xSave() {
+  const x = st.xdraft, inp = $('#x-name'); if (inp) x.name = inp.value.trim().replace(/\s+/g, ' ').slice(0, 40);
+  x.err = xErr(x); if (x.err) return render();
+  if (x.isNew) st.exercises.push(E.normalizeCustomEx({ name: x.name, muscle: x.muscle }));
+  else {
+    if (x.name !== x.orig) { store.saveExercises(st.exercises); store.renameAll({ [x.orig]: x.name }); reloadData(); }
+    const def = st.exercises.find(e => e.id === x.id); if (def) Object.assign(def, { name: x.name, muscle: x.muscle });
+    for (const w of st.workouts) if (w.exercise === x.name) w.muscle = x.muscle;
+    store.saveWorkouts(st.workouts);
+  }
+  store.saveExercises(st.exercises);
+  if (x.isNew || st.openEx === x.orig) { st.openEx = x.name; st.settings.exSel = x.name; store.saveSettings(st.settings); st.panelAnim = x.isNew && !reducedMotion(); }
+  st.sheet = null; st.xdraft = null; toast(x.isNew ? 'Übung angelegt' : 'Gespeichert'); render();
+  requestAnimationFrame(() => $(`[data-exsel="${CSS.escape(x.name)}"]`)?.scrollIntoView({ block: 'nearest' }));
+}
+function xDelete() {
+  const x = st.xdraft, used = st.combos.filter(c => c.steps.some(y => y.exercise === x.orig));
+  if (used.length) { x.err = `Wird in ${used.length > 1 ? 'den Kombis' : 'der Kombi'} „${used.map(c => c.name).join('“, „')}“ verwendet. Dort zuerst ersetzen.`; return render(); }
+  const ws = st.workouts.filter(w => w.exercise === x.orig);
+  if (!confirm(`Übung „${x.orig}“${ws.length ? ` und ${ws.length} ${ws.length === 1 ? 'Workout' : 'Workouts'}` : ''} löschen? Verlauf und Fitnesstest-Werte bleiben erhalten.`)) return;
+  const ids = ws.map(w => w.id); st.workouts = st.workouts.filter(w => !ids.includes(w.id)); store.saveWorkouts(st.workouts);
+  const gone = st.week.entries.filter(e => ids.includes(e.workoutId)).map(e => e.id); if (gone.length) { st.week.entries = st.week.entries.filter(e => !gone.includes(e.id)); st.week.removed.push(...gone); saveWeek(); }
+  st.exercises = st.exercises.filter(e => e.id !== x.id); store.saveExercises(st.exercises);
+  if (st.openEx === x.orig) st.openEx = null;
+  st.sheet = null; st.xdraft = null; toast('Übung gelöscht'); render();
 }
 
 // ---------- Kombi-Training (v1.7.0): 2–4 Übungen im Wechsel, Bearbeiten im Sheet auf der Startseite ----------
@@ -290,7 +351,7 @@ function comboEditSheet() {
     return `<div class="cstep" data-ci="${i}"><div class="cstep-h"><b>Schritt ${n}</b><span></span>
         ${i > 0 ? `<button class="icon sm" data-act="cstep-up" data-ci="${i}" aria-label="Schritt ${n} nach oben">↑</button>` : ''}
         ${c.steps.length > E.COMBO_MIN_STEPS ? `<button class="icon sm" data-act="cstep-del" data-ci="${i}" aria-label="Schritt ${n} entfernen">✕</button>` : ''}</div>
-      <div class="chips cexs" role="radiogroup" aria-label="Übung für Schritt ${n}">${E.EXERCISES.map(ex => `<button class="chip ${ex === x.exercise ? 'on' : ''}" role="radio" aria-checked="${ex === x.exercise}" data-act="cstep-ex" data-ci="${i}" data-cex="${ex}">${ex}</button>`).join('')}</div>
+      <div class="chips cexs" role="radiogroup" aria-label="Übung für Schritt ${n}">${[...new Set([...allEx(), x.exercise])].map(ex => `<button class="chip ${isBase(ex) ? '' : 'cx'} ${ex === x.exercise ? 'on' : ''}" role="radio" aria-checked="${ex === x.exercise}" data-act="cstep-ex" data-ci="${i}" data-cex="${esc(ex)}">${esc(ex)}</button>`).join('')}</div>
       <div class="cstep-v"><div class="cfield"><small>Wiederholungen</small>${cstepper('reps', i, x.reps, '', `Wiederholungen Schritt ${n}`)}</div><div class="cfield"><small>Pause danach</small>${cstepper('restSec', i, x.restSec, 's', `Pause Schritt ${n}`)}</div></div>
       <p class="muted sm chint">${mx ? `Vorschlag ${E.comboReps(mx.v)} = 40 % von Max ${mx.v}` : 'Ohne Fitnesstest: Vorschlag 5'}</p></div>`; }).join('');
   const limChips = [...new Set([...E.COMBO_LIMITS, ...(E.COMBO_LIMITS.includes(c.limitMin) ? [] : [c.limitMin])])].sort((a, b) => a - b);
@@ -348,7 +409,7 @@ function comboSave() {
 // ---------- Wochenplan ----------
 const winfo = id => { const w = workoutById(id); if (w) return { name: w.name, exercise: w.exercise, muscle: w.muscle, limitMin: w.limitMin };
   const c = comboById(id); // v1.7.0 Kombi im Wochenplan: Dauer = Zeitlimit bzw. geschätzt
-  return c && { name: c.name, exercise: 'Kombi', exercises: E.comboExercises(c), combo: true, limitMin: c.mode === 'time' ? c.limitMin : Math.max(1, Math.ceil(E.comboPlan(c, ex => tempoOf(ex).spr).durSec / 60)) }; };
+  return c && { name: c.name, exercise: 'Kombi', exercises: E.comboExercises(c), muscles: E.comboExercises(c).map(muscleFor), combo: true, limitMin: c.mode === 'time' ? c.limitMin : Math.max(1, Math.ceil(E.comboPlan(c, ex => tempoOf(ex).spr).durSec / 60)) }; };
 const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const ymdL = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 function saveWeek() { store.savePlan(st.week); }
@@ -487,8 +548,8 @@ function viewAssess() {
     <main class="scroll setup">
       <h2 class="q">${a.setup ? 'Fitnesstest: Übung wählen' : 'Übung für den Fitnesstest'}</h2>
       <p class="muted">Der Test misst deine maximalen sauberen Wiederholungen am Stück. Daraus berechnet der Timer Satzgröße, Pausen und 3 Phasen.</p>
-      <div class="extiles">${E.EXERCISES.map(ex => { const mx = maxOf(ex), done = a.saved.includes(ex);
-        return `<button class="extile ${done ? 'on' : ''}" data-act="assess-pick" data-aex="${ex}"><span class="exname">${ex}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>${done ? ' · neu' : ''}` : 'Test offen'}</span></button>`; }).join('')}</div>
+      <div class="extiles">${allEx().map(ex => { const mx = maxOf(ex), done = a.saved.includes(ex);
+        return `<button class="extile ${isBase(ex) ? '' : 'cust'} ${done ? 'on' : ''}" data-act="assess-pick" data-aex="${esc(ex)}"><span class="exname">${esc(ex)}</span><span class="exmax ${mx ? '' : 'need'}">${mx ? `Max <b>${mx.v}</b>${done ? ' · neu' : ''}` : 'Test offen'}</span></button>`; }).join('')}</div>
       ${a.setup ? `<button class="btn ghost wide" data-act="setup-skip">Überspringen</button>` : ''}
     </main>`;
   }
@@ -503,6 +564,7 @@ function viewAssess() {
         <li>Countdown 3, 2, 1, dann läuft die Zeit.</li>
         <li>Nach der letzten Wiederholung „Stopp“ tippen und die Zahl eingeben.</li>
       </ol>
+      ${a.ex === 'Ausfallschritte' ? '<p class="muted">Gezählt wird jeder Schritt, links und rechts im Wechsel.</p>' : ''}
       ${prev ? `<p class="muted">Bisher: ${prev.v} am ${dLong(prev.date)}${prev.source === 'test' ? '' : ' (eingegeben)'}</p>` : ''}
       ${(r => r.leftMs > 0 ? `<div class="recbox wait">${esc(r.group)} noch nicht erholt (${causeText(r)}): ${cd(r.until, 'noch ')}. Mit müden Muskeln fällt das Maximum zu niedrig aus.</div>` : '')(recOf(a.ex, 'test'))}
       <button class="btn primary wide big" data-act="assess-test">Test starten</button>
@@ -525,7 +587,7 @@ function viewAssess() {
     </main>`;
   }
   // done
-  const m = maxOf(a.ex), rest = E.EXERCISES.filter(x => x !== a.ex);
+  const m = maxOf(a.ex), rest = allEx().filter(x => x !== a.ex);
   return `${a.setup ? `<header class="top"><div class="brand">${LOGO}<span>EDT Timer</span></div><div class="ver">Einrichtung</div></header>` : assessTop('Fitnesstest', 'assess-finish')}
   <main class="scroll">
     <div class="hero pr"><div class="badge big">Gespeichert</div><div class="huge">${m.v}</div><div class="lbl">${esc(a.ex)} · Maximum${m.durMs ? ` in ${E.mmss(Math.floor(m.durMs / 1000) * 1000)}` : ''}</div></div>
@@ -533,7 +595,7 @@ function viewAssess() {
     <div class="planbox">${planBoxHtml({ ...a, val: m.v })}</div>
     <h3 class="h3">Nächste Übung testen</h3>
     <div class="chips">${rest.map(x => { const r = recOf(x, 'test');
-      return `<button class="chip ${maxOf(x) ? '' : 'need'}" data-act="assess-pick" data-aex="${x}">${x}${maxOf(x) ? ` · ${maxOf(x).v}` : ''}${r.leftMs > 0 ? ` · ${cd(r.until, 'Erholung ', 'erholt')}` : ''}</button>`; }).join('')}</div>
+      return `<button class="chip ${maxOf(x) ? '' : 'need'}" data-act="assess-pick" data-aex="${esc(x)}">${esc(x)}${maxOf(x) ? ` · ${maxOf(x).v}` : ''}${r.leftMs > 0 ? ` · ${cd(r.until, 'Erholung ', 'erholt')}` : ''}</button>`; }).join('')}</div>
     <button class="btn primary wide big" data-act="assess-finish">Fertig</button>
   </main>`;
 }
@@ -583,15 +645,16 @@ function stepper(path, val, unit, limKey) {
   return `<div class="stepper"><button data-step="${path}" data-lim="${limKey}" data-d="-1" aria-label="weniger">−</button><output>${val}<small>${unit}</small></output><button data-step="${path}" data-lim="${limKey}" data-d="1" aria-label="mehr">+</button></div>`;
 }
 function viewEdit() {
-  const w = st.draft, custom = !E.EXERCISES.includes(w.exercise);
+  const w = st.draft, def = customOf(w.exercise), custom = !isBase(w.exercise) && !def; // custom = neue eigene Übung (Freitext)
   const tempo = tempoOf(w.exercise), plan = E.simulate(w, tempo.spr), tl = E.phaseTimeline(w, tempo.spr), tn = tuneOf(w.exercise);
   const seg = (name, val, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-seg="${name}" data-v="${v}" class="${val === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   return `<header class="top"><button class="icon" data-go="home" aria-label="Zurück">‹</button><h2>${st.workouts.some(x => x.id === w.id) ? 'Workout bearbeiten' : 'Neues Workout'}</h2><button class="btn primary sm" data-act="save">Speichern</button></header>
   <main class="scroll form">
     <label class="field"><span>Name</span><input id="f-name" value="${esc(w.name)}" maxlength="60" autocomplete="off"></label>
-    <div class="field"><span>Übung</span><div class="chips">${E.EXERCISES.map(x => `<button data-ex="${x}" class="chip ${w.exercise === x ? 'on' : ''}">${x}</button>`).join('')}<button data-ex="__custom" class="chip ${custom ? 'on' : ''}">Eigene …</button></div>
-      ${custom ? `<input id="f-ex" value="${esc(w.exercise)}" placeholder="z. B. Ausfallschritte" maxlength="40">` : ''}</div>
-    ${custom ? `<div class="field"><span>Muskelgruppe <small class="muted">für die Erholung</small></span>${seg('muscle', w.muscle, [['push', 'Brust/Trizeps/Schulter'], ['legs', 'Beine'], ['pull', 'Rücken/Bizeps'], ['own', 'eigene']])}</div>` : ''}
+    <div class="field"><span>Übung</span><div class="chips">${allEx().map(x => `<button data-ex="${esc(x)}" class="chip ${isBase(x) ? '' : 'cx'} ${w.exercise === x ? 'on' : ''}">${esc(x)}</button>`).join('')}<button data-ex="__custom" class="chip ${custom ? 'on' : ''}">Neue …</button></div>
+      ${custom ? `<input id="f-ex" value="${esc(w.exercise)}" placeholder="z. B. Burpees" maxlength="40">` : ''}
+      ${def ? `<small class="muted exnote">Muskelgruppe ${def.muscle === 'own' ? 'eigene' : esc(MUSCLE_LABEL[def.muscle])} · ändern über „Übung bearbeiten“ auf der Kachel</small>` : ''}</div>
+    ${custom ? `<div class="field"><span>Muskelgruppe <small class="muted">für die Erholung</small></span><div class="chips">${E.MUSCLE_CHOICES.map(k => `<button data-seg="muscle" data-v="${k}" class="chip ${w.muscle === k ? 'on' : ''}">${MUSCLE_LABEL[k]}</button>`).join('')}</div></div>` : ''}
     ${autoPanel(w)}
     <div class="field"><span>Zeitlimit</span><div class="row2">${stepper('limitMin', w.limitMin, ' min', 'limitMin')}<input type="range" id="f-lim" min="1" max="60" value="${w.limitMin}"></div></div>
     <div class="field"><span>Phasen</span>
@@ -1110,7 +1173,7 @@ function devInfo(sr, i) {
 }
 function devPanel(defEx) {
   const mode = st.devMode || 'reg';
-  const exList = mode === 'combo' ? [...E.EXERCISES] : [...new Set([...E.EXERCISES, ...st.history.map(h => h.exercise).filter(Boolean)])];
+  const exList = mode === 'combo' ? [...new Set([...E.EXERCISES, ...st.history.filter(E.isCombo).flatMap(h => h.exercises || Object.keys(h.perEx || {}))])] : [...new Set([...E.EXERCISES, ...st.history.map(h => h.exercise).filter(Boolean)])];
   let exSel = st.devEx === undefined ? defEx : st.devEx;
   if (exSel != null && !exList.includes(exSel)) exSel = null;
   const sr = devData(exSel), anim = st.devAnim && !reducedMotion(); st.devAnim = false;
@@ -1173,7 +1236,7 @@ function viewMore() {
     ${maxPanel('more')}
     <h3 class="h3">Erholung</h3>
     <div class="panel recpanel">${[['recAfterTest', 'Fitnesstest → EDT'], ['recEdt', 'EDT → EDT'], ['recTests', 'Fitnesstest → Fitnesstest']].map(([k, l]) => `<div class="prow"><span>${l}</span><div class="stepper"><button data-rec="${k}" data-d="-1" aria-label="weniger">−</button><output>${s[k]}<small> min</small></output><button data-rec="${k}" data-d="1" aria-label="mehr">+</button></div></div>`).join('')}
-      <p class="muted">Gilt je Muskelgruppe. Liegestütze und Dips teilen sich Brust/Trizeps/Schulter; andere Gruppen sind sofort frei.</p>
+      <p class="muted">Gilt je Muskelgruppe. Geteilte Muskeln: Liegestütze und Dips (Brust/Trizeps/Schulter), Kniebeugen und Ausfallschritte (Beine), Ausfallschritte und Beckenheben (Gesäß). Andere Gruppen sind sofort frei.</p>
       ${notifyRow()}
       <p class="tip">${DAY_TIP}</p></div>
     <h3 class="h3">Ton & Anzeige</h3>
@@ -1236,7 +1299,12 @@ function go(view) {
 
 function saveDraft() {
   const name = $('#f-name'); if (name) st.draft.name = name.value.trim() || 'Workout';
-  const ex = $('#f-ex'); if (ex) st.draft.exercise = ex.value.trim() || 'Übung';
+  const ex = $('#f-ex'); if (ex) st.draft.exercise = ex.value.trim().replace(/\s+/g, ' ').slice(0, 40) || 'Übung';
+  // v1.8.0: Freitext → Grundübung bzw. vorhandene eigene Übung, sonst neue eigene Übung (eigene Kachel)
+  const nm = st.draft.exercise, known = E.baseExercise(nm) || st.exercises.find(x => E.exKey(x.name) === E.exKey(nm))?.name;
+  if (known) st.draft.exercise = known;
+  else { st.exercises.push(E.normalizeCustomEx({ name: nm, muscle: st.draft.muscle })); store.saveExercises(st.exercises); }
+  const def = customOf(st.draft.exercise); if (def) st.draft.muscle = def.muscle;
   const w = E.normalizeWorkout(st.draft); w.template = false;
   const i = st.workouts.findIndex(x => x.id === w.id);
   if (i >= 0) st.workouts[i] = w; else st.workouts.push(w);
@@ -1255,9 +1323,9 @@ app.addEventListener('click', e => {
     const n = $('#f-name'); if (n) st.draft.name = n.value; return render();
   }
   if (d.seg) { setPath(st.draft, d.seg, d.seg === 'auto.phases' ? +d.v : d.v); if (d.seg.startsWith('auto.')) reauto(); const n = $('#f-name'); if (n) st.draft.name = n.value; return render(); }
-  if (d.ex) { const n = $('#f-name'); if (n) st.draft.name = n.value; st.draft.exercise = d.ex === '__custom' ? (E.EXERCISES.includes(st.draft.exercise) ? '' : st.draft.exercise) : d.ex; reauto(); render(); if (d.ex === '__custom') $('#f-ex')?.focus(); return; }
+  if (d.ex) { const n = $('#f-name'); if (n) st.draft.name = n.value; st.draft.exercise = d.ex === '__custom' ? (allEx().includes(st.draft.exercise) ? '' : st.draft.exercise) : d.ex; reauto(); render(); if (d.ex === '__custom') $('#f-ex')?.focus(); return; }
   if (d.exsel) {
-    if (d.exsel !== '__own' && openKey() !== d.exsel && !maxOf(d.exsel) && !st.settings.asked.includes(d.exsel)) { st.openEx = d.exsel; st.settings.exSel = d.exsel; store.saveSettings(st.settings); return openAssess(d.exsel); }
+    if (isBase(d.exsel) && openKey() !== d.exsel && !maxOf(d.exsel) && !st.settings.asked.includes(d.exsel)) { st.openEx = d.exsel; st.settings.exSel = d.exsel; store.saveSettings(st.settings); return openAssess(d.exsel); }
     return toggleEx(d.exsel);
   }
   if (d.hist) { st.result = st.history.find(h => h.id === d.hist); st.resultFrom = 'history'; return go('result'); }
@@ -1297,8 +1365,15 @@ app.addEventListener('click', e => {
       st.cdraft = null; st.sheet = null; toast('Kombi gelöscht'); render(); } return;
     case 'cstep-ex': { const c = st.cdraft, x = c.steps[+d.ci], n = $('#c-name'); if (n) c.name = n.value; if (x.exercise !== d.cex) { x.exercise = d.cex; x.reps = E.comboReps(maxOf(d.cex)?.v); } return render(); }
     case 'cstep-add': { const c = st.cdraft, n = $('#c-name'); if (n) c.name = n.value; if (c.steps.length >= E.COMBO_MAX_STEPS) return;
-      const used = c.steps.map(x => x.exercise), ex = E.EXERCISES.find(e => !used.includes(e)) || E.EXERCISES[0];
+      const used = c.steps.map(x => x.exercise), ex = allEx().find(e => !used.includes(e)) || E.EXERCISES[0];
       c.steps.push({ exercise: ex, reps: E.comboReps(maxOf(ex)?.v), restSec: c.steps.at(-1).restSec }); return render(); }
+    // Eigene Übungen
+    case 'xnew': st.xdraft = { isNew: true, name: '', muscle: 'own', err: '' }; st.sheet = 'xedit'; st.xAnim = true; render(); $('#x-name')?.focus(); return;
+    case 'xedit': { const x = st.exercises.find(e => e.id === d.xid); if (!x) return; st.xdraft = { ...x, orig: x.name, err: '' }; st.sheet = 'xedit'; st.xAnim = true; return render(); }
+    case 'xmus': { const n = $('#x-name'); if (n) st.xdraft.name = n.value; st.xdraft.muscle = d.xm; return render(); }
+    case 'xsave': return xSave();
+    case 'xdel': return xDelete();
+    case 'xcancel': st.xdraft = null; st.sheet = null; return render();
     case 'cstep-del': { const c = st.cdraft, n = $('#c-name'); if (n) c.name = n.value; if (c.steps.length > E.COMBO_MIN_STEPS) c.steps.splice(+d.ci, 1); return render(); }
     case 'cstep-up': { const c = st.cdraft, i = +d.ci, n = $('#c-name'); if (n) c.name = n.value; if (i > 0) [c.steps[i - 1], c.steps[i]] = [c.steps[i], c.steps[i - 1]]; return render(); }
     case 'cmode': { const c = st.cdraft, l = +d.clim, n = $('#c-name'); if (n) c.name = n.value; if (l) { c.mode = 'time'; c.limitMin = l; } else c.mode = 'rounds'; return render(); }
@@ -1342,8 +1417,8 @@ app.addEventListener('click', e => {
       Object.assign(a, { step: 'input', durMs: now() - a.t0, source: 'test', val: maxOf(a.ex)?.v || a.val }); go('assess'); $('#a-num')?.select(); return; }
     case 'assess-cancel-test': A.keepAwake(false); st.assess.step = 'intro'; return go('assess');
     case 'edit': st.draft = structuredClone(w); return go('edit');
-    case 'new': { const ex = st.settings.exSel === '__own' ? 'Eigene Übung' : st.settings.exSel || 'Liegestütze';
-      st.draft = E.normalizeWorkout({ id: uid('w'), name: `${ex} EDT 5 min`, exercise: ex, limitMin: 5, phases: E.planFromMax(ex, 25).phases, auto: { enabled: E.EXERCISES.includes(ex) } });
+    case 'new': { const k = openKey() || st.settings.exSel, ex = allEx().includes(k) ? k : 'Liegestütze';
+      st.draft = E.normalizeWorkout({ id: uid('w'), name: `${ex} EDT 5 min`, exercise: ex, muscle: muscleFor(ex), limitMin: 5, phases: E.planFromMax(ex, 25).phases, auto: { enabled: isBase(ex) || !!maxOf(ex) } });
       reauto(); return go('edit'); }
     case 'save': return saveDraft();
     case 'addphase': { if (st.draft.phases.length >= E.MAX_PHASES) return; manualPhases(); const last = st.draft.phases.at(-1); st.draft.phases.at(-1).rounds = 5; st.draft.phases.push({ reps: last.reps, restSec: last.restSec + 5, rounds: null }); return render(); }
@@ -1381,7 +1456,7 @@ app.addEventListener('click', e => {
     }
     case 'import': return $('#f-import').click();
     case 'templates': st.workouts = store.restoreTemplates(); return toast('Vorlagen wiederhergestellt');
-    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.combos = []; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
+    case 'wipe': if (confirm('Alle Workouts und den gesamten Verlauf löschen?')) { store.wipe(); st.workouts = store.workouts(); st.history = []; st.combos = []; st.exercises = []; st.openEx = null; st.maxes = {}; st.tunes = {}; st.settings = store.settings(); st.week = W.normalizePlan(null); applySettings(); toast('Gelöscht'); render(); } return;
     case 'install': st.installEvt?.prompt(); st.installEvt = null; return render();
     case 'sw-check': return checkUpdate(true);
   }
@@ -1405,7 +1480,7 @@ app.addEventListener('change', async e => {
   if (t.dataset.wset) { st.week[t.dataset.wset] = t.checked; saveWeek(); return render(); }
   if (t.dataset.set) { st.settings[t.dataset.set] = t.checked; store.saveSettings(st.settings); applySettings(); if (t.dataset.set === 'recNotify') render(); return; }
   if (t.id === 'f-import' && t.files[0]) {
-    try { const r = store.importAll(JSON.parse(await t.files[0].text())); st.workouts = store.workouts(); st.history = store.history(); st.maxes = store.maxes(); st.tunes = store.tunes(); st.settings = store.settings(); st.week = W.normalizePlan(store.plan()); st.combos = store.combos(); applySettings();
+    try { const r = store.importAll(JSON.parse(await t.files[0].text())); store.healExercises(); reloadData(); st.settings = store.settings(); st.week = W.normalizePlan(store.plan()); st.combos = store.combos(); applySettings();
       toast(`Importiert: ${r.workouts} Workouts, ${r.sessions} Einheiten`); render(); }
     catch (err) { toast('Import fehlgeschlagen: ' + err.message); }
   }
@@ -1423,6 +1498,8 @@ if ((st.settings.planVer || 0) < 2) {
   store.saveWorkouts(st.workouts); st.settings.planVer = 2; store.saveSettings(st.settings);
 }
 if (migrated.length) setTimeout(() => toast('Daten aus RepZeit übernommen'), 400);
+if (heal180.renamed.length) setTimeout(() => toast(`Jetzt Grundübung: ${heal180.renamed.map(n => `${n} → ${E.baseExercise(n)}`).join(', ')}`), 600);
+if (st.settings.exSel === '__own') { st.settings.exSel = 'Liegestütze'; store.saveSettings(st.settings); } // v1.8.0: Sammelkachel entfällt
 FX.setPref(st.settings.anim || 'on'); FX.initGlow(); st.fxReveal = true;
 const needSetup = () => !st.settings.setupDone && !Object.values(st.maxes).some(l => l && l.length);
 
