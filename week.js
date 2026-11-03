@@ -1,5 +1,5 @@
 // Wochenplan: Einträge je Wochentag, Abstandsprüfung gegen die Erholung, Erledigt-Abgleich, Kalender-Export (.ics).
-import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=f87084c0';
+import { musclesOf, overlaps, RECOVERY_DEFAULTS } from './engine.js?v=beff3d57';
 
 export const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 export const DAYS_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
