@@ -1,6 +1,6 @@
 {
   "name": "edt-timer",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "private": true,
   "type": "module",
   "description": "EDT Timer – PWA für Escalating Density Training mit Cluster-Sätzen",

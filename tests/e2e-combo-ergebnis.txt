@@ -1,7 +1,7 @@
-2026-11-03T03:32:00.996Z http://127.0.0.1:18745/
+2026-11-03T04:13:36.295Z http://127.0.0.1:18745/
 ✓ Rekord-Kacheln vorher – {"Liegestütze":["30","99"],"Kniebeugen":["Test offen","80"],"Dips":["Test offen","–"],"Klimmzüge":["10","–"],"Ausfallschritte":["Test offen","–"],"Beckenheben":["Test offen","–"],"Superman":["Test offen","–"],"Sit-ups":["Test offen","–"]}
 ✓ Startseite: Abschnitt „Kombi“ unter „Übungen“, leerer Zustand mit „Kombi anlegen“
-✓ Kombi über die UI angelegt (Liegestütze 12/20 s, Klimmzüge 4/20 s, 10 min) und in edt.combos gespeichert – cmvzi8bryvswq
+✓ Kombi über die UI angelegt (Liegestütze 12/20 s, Klimmzüge 4/20 s, 10 min) und in edt.combos gespeichert – cmvzi8brlj068
 ✓ Satz 1: „12 Liegestütze“ groß, darunter „Danach: 4 Klimmzüge“, Ansage „Los: 12 Liegestütze“
 ✓ Übungen wechseln sich ab (18 Sätze), Pausen 20 s, Ansagen „Pause 20 Sekunden. Nächster Satz: …“ und „Los: …“
 ✓ Ergebnis: Summen je Übung + Gesamt, Verlaufseintrag type combo – 108 + 34 = 142

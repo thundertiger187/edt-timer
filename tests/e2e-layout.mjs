@@ -12,7 +12,7 @@ if (!base) { server = spawn('python3', ['-m', 'http.server', '18741', '--bind', 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const log = []; const ok = (n, x = '') => { const l = `✓ ${n}${x ? ' – ' + x : ''}`; log.push(l); console.log(l); };
 const NOW = Date.parse('2026-10-31T17:30:00+01:00');
-const VIEWPORTS = [[360, 640], [375, 667], [390, 844], [412, 915], [844, 390]];
+const VIEWPORTS = [[360, 640], [375, 667], [390, 844], [412, 915], [412, 780], [412, 720], [844, 390]]; // v1.8.1: 412×780 ≈ Android Chrome mit Adressleiste
 const SHOTS = { '360x640': '60_pause_360.png', '390x844': '61_pause_390.png', '844x390': '62_pause_landscape.png' };
 const history = [{ id: 'h1', workoutId: 'tpl-liegestuetz-5', workoutName: 'Liegestütz-EDT 5 min', exercise: 'Liegestütze', date: new Date(NOW - 3 * 86400000).toISOString(), limitMs: 300000, total: 99,
   sets: Array.from({ length: 10 }, (_, i) => ({ n: i + 1, target: 10, done: 10 })), elapsedMs: 300000, aborted: false, perMin: 19.8, prevBest: null }];
@@ -99,6 +99,9 @@ for (const [w, h] of VIEWPORTS) {
   await page.waitForSelector('#t-lead'); const r = { lead: await check(page, vp, 'lead') };
   await page.clock.runFor(5100); await page.waitForSelector('[data-act=done]'); await page.waitForTimeout(100);
   r.work = await check(page, vp, 'work');
+  { const m = await page.evaluate(() => { const t = document.querySelector('.train'); return { h: Math.round(document.querySelector('.train > .hit').getBoundingClientRect().height), sc: t.scrollHeight - t.clientHeight, land: innerWidth > innerHeight }; });
+    const bad = []; if (!m.land && (m.h < 80 || m.h > 112)) bad.push(`Knopf ${m.h} px`); if (m.sc > 1) bad.push(`scrollt ${m.sc} px`);
+    if (bad.length) { fails++; console.log(`✗ ${vp} Satz: ${bad.join('; ')}`); if (!REPORT) assert.fail(`${vp} Satz: ${bad.join('; ')}`); } }
   await page.click('[data-act=done]'); await page.waitForSelector('[data-act=skip]');
   await page.clock.runFor(3000); await page.waitForTimeout(100);
   r.rest = await check(page, vp, 'rest'); await inside(page, vp); // 1. Pause: Bewertung „Satz 1“ + „Letzter Satz“ sichtbar
@@ -119,6 +122,23 @@ for (const [w, h] of VIEWPORTS) {
   await page.reload(); await page.waitForSelector('.ccard [data-act=combo-start]'); await page.click('.ccard [data-act=combo-start]');
   await page.waitForSelector('#t-lead'); await page.clock.runFor(5100); await page.waitForSelector('.cwork'); await page.waitForTimeout(100);
   r.cwork = await check(page, vp, 'cwork');
+  // v1.8.1: Stapel Position → Übung → „tatsächlich geschafft“ → Zähler → „Danach“ → Knopf; nichts verdeckt, Knopf moderat hoch, kein Scrollen nötig
+  const cw = await page.evaluate(() => {
+    const g = s => document.querySelector(s).getBoundingClientRect(), order = ['.train > .pos', '.cwork .cex', '.cwork .lbl', '.cwork .adj', '.cwork .cnext', '.train > .hit'];
+    const R = order.map(g), bad = [];
+    for (let i = 1; i < R.length; i++) if (R[i].top < R[i - 1].bottom - 0.5) bad.push(`${order[i]} beginnt über ${order[i - 1]}`);
+    for (const s of ['.cwork .cex', '.cwork .lbl', '.cwork .cnext']) { const e = document.querySelector(s), r = e.getBoundingClientRect();
+      for (const [fx, fy] of [[0.5, 0.5], [0.1, 0.5], [0.9, 0.5]]) { const h = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy); if (!h || !e.contains(h)) bad.push(`${s} verdeckt von ${h?.className || h?.tagName}`); } }
+    const t = document.querySelector('.train'), hit = R.at(-1);
+    return { bad, hit: Math.round(hit.height), scroll: t.scrollHeight - t.clientHeight, land: innerWidth > innerHeight };
+  });
+  if (!cw.land && (cw.hit < 80 || cw.hit > 112)) cw.bad.push(`Knopf ${cw.hit} px hoch`);
+  if (cw.scroll > 1) cw.bad.push(`Ansicht muss ${cw.scroll} px scrollen`);
+  if (cw.land) cw.bad = cw.bad.filter(x => !x.includes('beginnt über')); // Querformat: Spalten statt Stapel
+  if (cw.bad.length) { fails++; console.log(`✗ ${vp} Kombi-Stapel: ${cw.bad.join('; ')}`); if (!REPORT) assert.fail(`${vp} Kombi-Stapel: ${cw.bad.join('; ')}`); }
+  if (vp === '412x915') await page.screenshot({ path: path.join(SCREENS, '90_kombi_training_fix.png') });
+  if (vp === '360x640') await page.screenshot({ path: path.join(SCREENS, '91_kombi_training_360.png') });
+  ok(`${vp}: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ ${cw.hit} px`);
   await page.click('[data-act=done]'); await page.waitForSelector('[data-act=skip]'); await page.clock.runFor(2000); await page.waitForTimeout(100);
   r.crest = await check(page, vp, 'crest'); await inside(page, vp);
   await page.click('[data-act=skip]'); await page.waitForSelector('.cwork'); await page.waitForTimeout(100); r.cwork2 = await check(page, vp, 'cwork');

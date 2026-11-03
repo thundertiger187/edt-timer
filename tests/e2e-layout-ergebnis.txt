@@ -1,11 +1,22 @@
-2026-11-03T03:23:27.230Z http://127.0.0.1:18741/
+2026-11-03T04:09:51.235Z http://127.0.0.1:18741/
 ✓ 360x640: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 360x640: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 83 px
 ✓ 360x640: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 156/131/161 px
 ✓ 375x667: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 375x667: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 87 px
 ✓ 375x667: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 183/158/188 px
 ✓ 390x844: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 390x844: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 110 px
 ✓ 390x844: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 234/234/234 px
 ✓ 412x915: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 412x915: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 110 px
 ✓ 412x915: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 240/240/240 px
+✓ 412x780: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 412x780: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 101 px
+✓ 412x780: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 209/190/216 px
+✓ 412x720: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 412x720: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 94 px
+✓ 412x720: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 149/130/156 px
 ✓ 844x390: Startseite 10 Kacheln (8 Grund + 2 eigene) ohne Überlauf/Überlappung – 2 Spalten, Kachel 115 px
+✓ 844x390: Kombi-Satz als Stapel ohne Verdecken, „Danach“ frei, „Satz geschafft“ 200 px
 ✓ 844x390: Vorlauf, Satz, Pause (Bewertung, Letzter Satz, Hochrechnung), Fitnesstest, Kombi-Satz und -Pause – keine Überlappung, alles im Bildschirm – Ring 240/240/240 px

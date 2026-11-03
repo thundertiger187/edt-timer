@@ -61,6 +61,12 @@ Phase 3 · 3:40–5:00 · 8 Wdh / 20 s Pause, Sätze 7–9
 
 Begründung (Praxisregeln, keine Studienwerte): Viele Sätze deutlich unter dem Maximum halten die Wiederholungsqualität über die ganze Zeit; 40–50 % des Maximums ist eine verbreitete Faustregel. Phase 1 nutzt die frische Phase mit kurzer Pause, Phase 2 und 3 fangen die Ermüdung mit längerer Pause bzw. kleineren Sätzen ab. Klimmzüge und Dips belasten pro Wiederholung mehr, daher der Pausenfaktor. Alle Werte sind Startpunkte und im Editor überschreibbar.
 
+## Satz-Ansicht ohne Überlappung (v1.8.1)
+
+- **Fehler:** Auf Android (Chrome mit Adressleiste, ≈ 412×780 CSS-px) lagen im Kombi-Satz „Runde 1 · Schritt 1/2 · gesamt 1“ und „10 Liegestütze“ übereinander, und „Danach: …“ verschwand unter dem grünen Knopf. Ursache: Der mittlere Bereich (`.work`) durfte kleiner werden als sein Inhalt (`flex-basis:0`, `min-height:0`, zentriert), während „Satz geschafft“ fest 38 % der Höhe belegte. Bei wenig Höhe lief der Inhalt nach oben und unten über. Der normale EDT-Satz hatte denselben Fehler ab etwa 720 px Höhe.
+- **Lösung:** Reiner Fluss ohne absolute Positionen. `.work` ist nie kleiner als sein Inhalt (`flex:1 0 auto`) und zentriert nur im übrigen Platz. „Satz geschafft“ hat eine feste Höhe von `clamp(88px, 13dvh, 110px)`, bei ≤ 700 px Höhe 80–96 px. Bei „Tippen“-Zählung ist der Knopf mit 120–200 px absichtlich größer, „Stopp“ im Fitnesstest ist 96–130 px hoch. Reicht der Platz trotzdem nicht (z. B. große Systemschrift), scrollt die Ansicht, statt zu überlappen. Im Querformat steht der Knopf mittig in der rechten Spalte und ist höchstens 200 px hoch.
+- **Tests:** `tests/e2e-layout.mjs` läuft zusätzlich auf 412×780 und 412×720. Für den Kombi-Satz prüft der Test die Reihenfolge Positionszeile → Übung → „tatsächlich geschafft“ → Zähler → „Danach“ → Knopf, dass nichts verdeckt ist (`elementFromPoint`), die Knopfhöhe (80–112 px) und dass nicht gescrollt werden muss. Das gilt auch für den normalen Satz. Screenshots: `screens/90_kombi_training_fix.png` (412×915), `screens/91_kombi_training_360.png`.
+
 ## Neue Grundübungen und eigene Übungen als Kacheln (v1.8.0)
 
 - **Neue Grundübungen:** Ausfallschritte, Beckenheben, Superman, Sit-ups. Jede hat eine Muskelgruppe, ein Strichmännchen (Kachel, Panel, Fitnesstest-Anleitung), eine 5-min-Vorlage (Auto-Plan aus), Level-Schwellen für den Fitnesstest und ein Tempo für die Zeitschätzung. Sie funktionieren überall wie die bisherigen vier: Erholung, Fitnesstest, Phasen, Rekorde, Diagramm, Wochenplan, Kombi.

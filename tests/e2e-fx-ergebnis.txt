@@ -1,8 +1,8 @@
-2026-11-03T03:22:43.791Z http://127.0.0.1:18739/
+2026-11-03T04:08:50.874Z http://127.0.0.1:18739/
 ✓ Startseite: Hintergrund „home“ (fxa, 20–40 s), oben sichtbar ≤ 300 ms, Karten unten blenden beim Scrollen ein – 30s, 6 Elemente unten
 ✓ Leuchtpunkt bei echtem Touch (touchscreen.tap, Chromium mobil): Glow 0,5 s punktuell, Panel öffnet – --gx 241px
 ✓ Leuchtpunkt: Element bei pointerdown an der Tippposition (cyan Kachel, grün Start-Button), pointer-events none, Tippen klappt Panel auf, Glow nach 0,9 s entfernt – --gx 76px --gy 602.438px
-✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 966, Folge 445 595 879 557 655 779 644 166 195 197 129 125
+✓ Ziffern-Effekt: Text/aria bleibt 123, Zufallsziffern nur als Pseudo-Inhalt, endet exakt auf 123, „Neuer Rekord“ + Leuchten – Mitte 598, Folge 766 766 464 568 685 646 488 146 155 188 127 127
 ✓ Verlauf: Panels/Einträge mit Einblendung, oben sofort sichtbar
 ✓ Seite verborgen → Hintergrund pausiert, danach weiter
 ✓ Timer: Hintergrund „work“ im Satz, „rest“ in der Pause (Überblendung 1,2 s), Uhr läuft genau – 8:00 → 7:49 nach 10 s
@@ -11,6 +11,6 @@
 ✓ Automatisch + System reduziert: sanfte Stufe – Glow nur Überblendung, Einblenden ohne Versatz, Hintergrund atmet statt zu wandern, Figuren statisch, Ziffern-Effekt läuft
 ✓ Automatisch ohne Systemvorgabe: volle Effekte
 ✓ Aus: kein Glow, keine Einblendung, kein Ziffern-Effekt/Leuchten, Hintergrund statisch (animation none)
-✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.8.0-f87084c0
+✓ Einstellung Mehr → Animationen: Automatisch/An/Aus, Standard An, wirkt sofort, bleibt nach Neuladen; Version sichtbar – 1.8.1-beff3d57
 ✓ Kontrast über die ganze Hintergrund-Schleife ≥ 4,5:1 für grauen Text – home: hellster Punkt rgb(42,54,22) → grau 4.67:1, weiß 11.71:1 | work: hellster Punkt rgb(43,54,22) → grau 4.66:1, weiß 11.68:1 | rest: hellster Punkt rgb(19,52,62) → grau 4.81:1, weiß 12.07:1
 ✓ Ohne IntersectionObserver: nichts versteckt, alle Karten sichtbar – 14 Elemente

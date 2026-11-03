@@ -669,3 +669,21 @@ html[data-motion=off] .fx-glow{display:none}html[data-motion=off] .rv{opacity:1!
 .setup .extile.cust{border-style:dashed}
 .fig .fbody polyline.back{opacity:.55}
 .xedit .btn.wide{margin-top:8px}
+/* ===== v1.8.1 Satz-Ansicht: sauberer Stapel, „Satz geschafft“ in normaler Höhe =====
+   Vorher: .work hatte flex-basis 0 + min-height 0 und zentrierten Inhalt, .hit nahm 38 % der Höhe.
+   War der Rest zu klein (Android mit Adressleiste ≈ 412×780), lief der Inhalt nach oben in die
+   Positionszeile und nach unten unter den Knopf. Jetzt ist .work nie kleiner als sein Inhalt,
+   der Knopf hat eine feste, moderate Höhe, und reicht der Platz trotzdem nicht, scrollt die Ansicht. */
+.train{overflow-y:auto;overscroll-behavior:contain}
+.train > .work{flex:1 0 auto;min-height:min-content;justify-content:center;padding:4px 0}
+.train > .hit{flex:0 0 auto;height:clamp(88px,13dvh,110px);min-height:0;gap:4px;font-size:26px}
+.train > .hit svg{width:40px;height:40px}
+.train > .hit.tap{height:clamp(120px,24dvh,200px)}
+.train > .hit.stop{height:clamp(96px,16dvh,130px)}
+.cwork{gap:6px}
+@media (max-height:700px){.train > .hit{height:clamp(80px,13dvh,96px);font-size:24px}.train > .hit svg{width:34px;height:34px}}
+@media (orientation:landscape) and (max-height:520px){
+  .train{overflow-y:visible}
+  .train:not(:has(.leadbox)) > .hit{height:min(200px,70dvh);min-height:0;align-self:center}
+  .train:not(:has(.leadbox)) > .work{min-height:0}
+}

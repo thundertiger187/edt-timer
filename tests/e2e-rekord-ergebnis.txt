@@ -1,4 +1,4 @@
-2026-11-03T03:21:54.871Z http://127.0.0.1:18736/
+2026-11-03T04:07:59.167Z http://127.0.0.1:18736/
 ✓ Kacheln: Max am Stück / Rekord 5 min (max, verkürzte Erholung zählt, 10 min/abgebrochen ignoriert, ältere Einträge), kein „erholt“ – Liegestütze: Max am Stück 25 · Rekord 5 min 112 ·   | Kniebeugen: Max am Stück 35 · Rekord 5 min – ·   | Dips: Max am Stück Test offen · Rekord 5 min 41 ·   | Klimmzüge: Max am Stück 8 · Rekord 5 min 34 · Erholung noch 9:00 | Ausfall­schritte: Max am Stück Test offen · Rekord 5 min – ·   | Becken­heben: Max am Stück Test offen · Rekord 5 min – ·   | Superman: Max am Stück Test offen · Rekord 5 min – ·   | Sit-ups: Max am Stück Test offen · Rekord 5 min – ·   | Burpees: Max am Stück Test offen · Rekord 5 min 63 ·  
 ✓ Layout 390 px: kein Überlauf, keine Überlappung mit Figur
 ✓ Countdown abgelaufen → Zeile weg, kein „erholt“
