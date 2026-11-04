@@ -1,5 +1,5 @@
 // Lokale Speicherung (localStorage). Kein Server.
-import { TEMPLATES, normalizeWorkout, normalizeCombo, EXERCISES, NEW_EXERCISES_180, mergeCustomExercises, renameExercises, baseRenames, normalizeCustomEx } from './engine.js?v=beff3d57';
+import { TEMPLATES, normalizeWorkout, normalizeCombo, EXERCISES, NEW_EXERCISES_180, mergeCustomExercises, renameExercises, baseRenames, normalizeCustomEx } from './engine.js?v=d234f7ff';
 const NAMES = { w: 'workouts', h: 'history', s: 'settings', a: 'active', m: 'maxes', t: 'tunes', p: 'plan', c: 'combos', x: 'exercises' };
 const K = Object.fromEntries(Object.entries(NAMES).map(([k, n]) => [k, 'edt.' + n]));
 /** Umbenennung RepZeit → EDT Timer: alte Schlüssel repzeit.* (gleiche Origin) einmalig nach edt.* kopieren.

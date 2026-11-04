@@ -5,7 +5,7 @@
   "lang": "de",
   "start_url": "./",
   "scope": "./",
-  "id": "./",
+  "id": "/edt-timer/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b0d10",
